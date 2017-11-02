@@ -30,18 +30,9 @@ class VacBot(ClientXMPP):
         print("----------------- starting session ----------------")
         self.ready_flag.set()
 
-    def clean(self, speed='standard', type='auto'):
-        self.make_command('clean', {'speed': speed, 'type': type}).send()
-
-    def charge(self):
-        self.make_command('charge', {'type': 'go'}).send()
-
-    def make_command(self, name, args):
-        clean = ET.Element(name, args)
-        ctl = ET.Element('ctl', {'td': name.capitalize()})
-        ctl.append(clean)
-        command = self.wrap_command(ctl)
-        return command
+    def send_command(self, action):
+        c = self.wrap_command(action.to_xml())
+        c.send()
 
     def wrap_command(self, ctl):
         q = self.make_iq_query(xmlns=u'com:ctl', ito=self.vacuum + '/atom',
@@ -52,12 +43,43 @@ class VacBot(ClientXMPP):
                 child.append(ctl)
                 return q
 
-    def run(self):
+    def connect_and_wait_until_ready(self):
         self.connect(('47.88.66.164', '5223'))  # TODO: change to domain name
         click.echo("starting")
         self.process()
         click.echo("done with process")
         self.wait_until_ready()
+
+    def run(self, action):
+        click.echo("running " + str(action))
+        self.send_command(action)
+        if action.wait:
+            click.echo("sleeping for " + str(action.wait) + "s")
+            time.sleep(action.wait)
+
+
+class VacBotCommand():
+    def __init__(self, name, args, wait=None, terminal=False):
+        self.name = name
+        self.args = args
+        self.wait = wait
+        self.terminal = terminal
+
+    def to_xml(self):
+        clean = ET.Element(self.name, self.args)
+        ctl = ET.Element('ctl', {'td': self.name.capitalize()})
+        ctl.append(clean)
+        return ctl
+
+
+class Clean(VacBotCommand):
+    def __init__(self, wait):
+        super().__init__('clean', {'type': 'auto', 'speed': 'standard'}, wait)
+
+
+class Charge(VacBotCommand):
+    def __init__(self):
+        super().__init__('charge', {'type': 'go'}, terminal=True)
 
 
 def read_config(filename):
@@ -77,19 +99,12 @@ def cli(charge, debug):
 @cli.command(help='cleans for the specified number of minutes')
 @click.argument('minutes', type=click.FLOAT)
 def clean(minutes):
-    def action(vacbot):
-        click.echo('cleaning')
-        vacbot.clean()
-        time.sleep(minutes * 60)
-
-    return action
+    return Clean(minutes * 60)
 
 
 @cli.command(help='returns to charger')
-def charge(vacbot): # TODO convert
-    click.echo('charging')
-    vacbot.charge()
-    time.sleep(20)
+def charge():
+    return Charge()
 
 
 @cli.resultcallback()
@@ -97,16 +112,13 @@ def run(actions, charge, debug):
     config = read_config(os.path.expanduser('~/.config/sucks.conf'))
     vacbot = VacBot(config['user'], config['domain'], config['resource'], config['secret'],
                     config['vacuum'])
-    vacbot.run()
+    vacbot.connect_and_wait_until_ready()
     for action in actions:
-        click.echo("running " + str(action))
-        action(vacbot)
-    if charge:
-        vacbot.charge()
+        vacbot.run(action)
+    if charge and not actions[-1].terminal:
+        vacbot.run(Charge())
     vacbot.disconnect(wait=True)
 
 
 if __name__ == '__main__':
-    click.echo("starting commands")
     cli()
-    click.echo("done with commands")
