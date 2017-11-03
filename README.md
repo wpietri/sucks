@@ -12,14 +12,16 @@ If you do try to use it, you'll need to create ~/.config/sucks.conf. It
 should look something like this:
 
 ```
-user=2017010101abdef012345
+user=20170101abcdef0123456
 domain=ecouser.net
 resource=abcdef01
 secret=[long base64 string]
 vacuum=[robot id]@126.ecorobot.net
 ```
 
-I got these values by using xmppeek to do a man-in-the-middle attack on
+I got these values by using
+[xmppeek](https://www.beneaththewaves.net/Software/XMPPPeek.html)
+to do a man-in-the-middle attack on
 the android app. You can use the included log_clean.py script to generate
 a config from a captured session. (I suspect that the Android app re-keys
 the connection on a regular basis, as the secret was changing regularly
