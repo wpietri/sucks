@@ -12,7 +12,6 @@ If you do try to use it, you'll need to create ~/.config/sucks.conf. It
 should look something like this:
 
 ```
-email=user@example.org
 user=2017010101abdef012345
 domain=ecouser.net
 resource=abcdef01
@@ -21,9 +20,10 @@ vacuum=[robot id]@126.ecorobot.net
 ```
 
 I got these values by using xmppeek to do a man-in-the-middle attack on
-the android app. I suspect that the Android app re-keys the connection
-on a regular basis, as the secret was changing regularly up until I
-cleared the Android app's data from my phone.
+the android app. You can use the included log_clean.py script to generate
+a config from a captured session. (I suspect that the Android app re-keys
+the connection on a regular basis, as the secret was changing regularly
+up until I cleared the Android app's data from my phone.)
 
 If you're curious about the protocol, I have [a very rough
 doc](protocol.md) started. I'll happily accept pull requests for it.

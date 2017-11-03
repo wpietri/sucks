@@ -1,5 +1,6 @@
-import sys
+import base64
 import re
+import sys
 
 # a script to take an xmpppeek log of a Ecovacs app session with a Deebot N79 and strip out some of the nonsense,
 # including any private identifiers
@@ -35,7 +36,8 @@ for line in sys.stdin:
         if match:
             robotid = match.group(1)
     if not auth_glob:
-        match = re.search('<auth mechanism="PLAIN" xmlns="urn:ietf:params:xml:ns:xmpp-sasl">([-A-Za-z0-9+/=]+)</auth>', line)
+        match = re.search('<auth mechanism="PLAIN" xmlns="urn:ietf:params:xml:ns:xmpp-sasl">([-A-Za-z0-9+/=]+)</auth>',
+                          line)
         if match:
             auth_glob = match.group(1)
     if source_ip:
@@ -51,13 +53,34 @@ for line in sys.stdin:
 
     # translate client commmands
 
-    line = re.sub('<iq id="(\d+)" to="ROBOTID@126.ecorobot.net/atom" from="USERID@ecouser.net/RESOURCEID" type="set"><query xmlns="com:ctl">(<ctl .*>)</query></iq>', 'id=\\1 command=\\2', line)
+    line = re.sub(
+        '<iq id="(\d+)" to="ROBOTID@126.ecorobot.net/atom" from="USERID@ecouser.net/RESOURCEID" type="set"><query xmlns="com:ctl">(<ctl .*>)</query></iq>',
+        'id=\\1 command=\\2', line)
 
     # translate server responses
 
-    line = re.sub('<iq to="USERID@ecouser.net/RESOURCEID" type="result" id="(\d+)" from="ROBOTID@126.ecorobot.net/atom"/>', 'id=\\1 result =empty', line)
-    line = re.sub('<iq to="USERID@ecouser.net/RESOURCEID" type="set" id="(\d+)" from="ROBOTID@126.ecorobot.net/atom"><query xmlns="com:ctl"><ctl id="(\d+)" ret="([^"]+)"/></query></iq>', 'id=\\1 id=\\2 result=\\3', line)
-    line = re.sub('<iq to="USERID@ecouser.net/RESOURCEID" type="set" id="(\d+)" from="ROBOTID@126.ecorobot.net/atom"><query xmlns="com:ctl">(<ctl .*)</query></iq>', 'id=\\1 response=\\2', line)
+    line = re.sub(
+        '<iq to="USERID@ecouser.net/RESOURCEID" type="result" id="(\d+)" from="ROBOTID@126.ecorobot.net/atom"/>',
+        'id=\\1 result =empty', line)
+    line = re.sub(
+        '<iq to="USERID@ecouser.net/RESOURCEID" type="set" id="(\d+)" from="ROBOTID@126.ecorobot.net/atom"><query xmlns="com:ctl"><ctl id="(\d+)" ret="([^"]+)"/></query></iq>',
+        'id=\\1 id=\\2 result=\\3', line)
+    line = re.sub(
+        '<iq to="USERID@ecouser.net/RESOURCEID" type="set" id="(\d+)" from="ROBOTID@126.ecorobot.net/atom"><query xmlns="com:ctl">(<ctl .*)</query></iq>',
+        'id=\\1 response=\\2', line)
 
     print(line)
 
+# per SASL plain auth: https://tools.ietf.org/html/rfc4616
+(authentication_id, authorization_id, password) = base64.b64decode(auth_glob).decode().split(sep='\0')
+
+# no idea what the leading field is, and the resource appears to be the same
+(mystery, resource, secret) = password.split('/')
+
+print("------------------")
+print("sample config:")
+print("user=" + userid)
+print("domain=ecouser.net")
+print("resource=" + resourceid)
+print("secret=" + secret)
+print("vacuum=" + robotid + "@126.ecorobot.net")
