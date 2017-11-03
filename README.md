@@ -23,9 +23,15 @@ vacuum=[robot id]@126.ecorobot.net
 I got these values by using xmppeek to do a man-in-the-middle attack on
 the android app. I suspect that the Android app re-keys the connection
 on a regular basis, as the secret was changing regularly up until I
-cleared the Android app's data from my phone. It should be possible to
-give this tool a command something like "login" that would create the config
-file automatically.
+cleared the Android app's data from my phone.
+
+If you're curious about the protocol, I have [a very rough
+doc](protocol.md) started. I'll happily accept pull requests for it.
+
+Why the project name? Well, a) it's ridiculous that I needed to MITM
+my own vacuum.  This is not the future I signed up for. There should
+be a nice, tidy RESTful API. That would be easy enough to make. And b),
+it's a vacuum.
 
 ## To Do
 
