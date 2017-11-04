@@ -37,9 +37,6 @@ it's a vacuum.
 
 ## To Do
 
-* implement common commands
-* stop sending back error messages in response to robot updates
-* track robot state (e.g., cleaning, stopped)
-* use tracked state to be smarter
-* log activity to aid in debugging
 * add probabilistic cleaning options
+* implement more commands
+* add a status commmand
