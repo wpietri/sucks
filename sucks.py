@@ -2,6 +2,8 @@ import configparser
 import itertools
 import logging
 import os
+import random
+import re
 import time
 from threading import Event
 
@@ -74,7 +76,6 @@ class VacBot(ClientXMPP):
         self.wait_until_ready()
 
     def run(self, action):
-        click.echo("performing " + str(action))
         self.send_command(action.to_xml())
         action.wait_for_completion(self)
 
@@ -88,7 +89,7 @@ class VacBotCommand():
 
     def wait_for_completion(self, bot):
         if self.wait:
-            click.echo("waiting in " + self.name + " for " + str(self.wait) + "s")
+            click.echo("waiting in " + self.command_name() + " for " + str(self.wait) + "s")
             time.sleep(self.wait)
 
     def to_xml(self):
@@ -98,12 +99,16 @@ class VacBotCommand():
         return ctl
 
     def __str__(self, *args, **kwargs):
-        return self.name + " command"
+        return self.command_name() + " command"
+
+    def command_name(self):
+        return self.__class__.__name__.lower()
 
 
 class Clean(VacBotCommand):
     def __init__(self, wait):
         super().__init__('clean', {'type': 'auto', 'speed': 'standard'}, wait)
+
 
 class Edge(VacBotCommand):
     def __init__(self, wait):
@@ -133,11 +138,49 @@ class Stop(VacBotCommand):
         logging.debug("done waiting in " + self.name)
 
 
+class FrequencyParamType(click.ParamType):
+    name = 'frequency'
+    RATIONAL_PATTERN = re.compile(r'([.0-9])/([.0-9])')
+
+    def convert(self, value, param, ctx):
+        result = None
+        try:
+            search = self.RATIONAL_PATTERN.search(value)
+            if search:
+                result = float(search.group(1)) / float(search.group(2))
+            else:
+                try:
+                    result = float(value)
+                except ValueError:
+                    pass
+        except ValueError:
+            pass
+
+        if result is None:
+            self.fail('%s is not a valid frequency' % value, param, ctx)
+        if 0 <= result <= 1:
+            return result
+
+        self.fail('%s is not between 0 and 1' % value, param, ctx)
+
+
+FREQUENCY = FrequencyParamType()
+
+
 def read_config(filename):
     parser = configparser.ConfigParser()
     with open(filename) as fp:
         parser.read_file(itertools.chain(['[global]'], fp), source=filename)
     return parser['global']
+
+
+def should_run(frequency):
+    if frequency is None:
+        return
+    n = random.random()
+    result = n <= frequency
+    logging.debug("tossing coin: {:0.3f} <= {:0.3f}: {}".format( n, frequency, result))
+    return result
 
 
 @click.group(chain=True)
@@ -149,14 +192,19 @@ def cli(charge, debug):
 
 
 @cli.command(help='auto-cleans for the specified number of minutes')
+@click.option('--frequency', '-f', type=FREQUENCY, help='frequency with which to run; e.g. 0.5 or 3/7')
 @click.argument('minutes', type=click.FLOAT)
-def clean(minutes):
-    return Clean(minutes * 60)
+def clean(frequency, minutes):
+    if should_run(frequency):
+        return Clean(minutes * 60)
+
 
 @cli.command(help='cleans room edges for the specified number of minutes')
+@click.option('--frequency', '-f', type=FREQUENCY, help='frequency with which to run; e.g. 0.5 or 3/7')
 @click.argument('minutes', type=click.FLOAT)
-def edge(minutes):
-    return Edge(minutes * 60)
+def edge(frequency, minutes):
+    if should_run(frequency):
+        return Edge(minutes * 60)
 
 
 @cli.command(help='returns to charger')
@@ -171,15 +219,22 @@ def stop():
 
 @cli.resultcallback()
 def run(actions, charge, debug):
-    config = read_config(os.path.expanduser('~/.config/sucks.conf'))
-    vacbot = VacBot(config['user'], config['domain'], config['resource'], config['secret'],
-                    config['vacuum'])
-    vacbot.connect_and_wait_until_ready()
-    for action in actions:
-        vacbot.run(action)
-    if charge and not actions[-1].terminal:
-        vacbot.run(Charge())
-    vacbot.disconnect(wait=True)
+    actions = list(filter(None.__ne__, actions))
+    if actions and charge and not actions[-1].terminal:
+        actions.append(Charge())
+
+    if actions:
+        config = read_config(os.path.expanduser('~/.config/sucks.conf'))
+        vacbot = VacBot(config['user'], config['domain'], config['resource'], config['secret'],
+                        config['vacuum'])
+        vacbot.connect_and_wait_until_ready()
+
+        for action in actions:
+            click.echo("performing " + str(action))
+            vacbot.run(action)
+
+        vacbot.disconnect(wait=True)
+
     click.echo("done")
 
 
