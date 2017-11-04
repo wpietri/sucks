@@ -105,6 +105,10 @@ class Clean(VacBotCommand):
     def __init__(self, wait):
         super().__init__('clean', {'type': 'auto', 'speed': 'standard'}, wait)
 
+class Edge(VacBotCommand):
+    def __init__(self, wait):
+        super().__init__('clean', {'type': 'border', 'speed': 'strong'}, wait)
+
 
 class Charge(VacBotCommand):
     def __init__(self):
@@ -144,10 +148,15 @@ def cli(charge, debug):
     logging.basicConfig(level=level, format='%(levelname)-8s %(message)s')
 
 
-@cli.command(help='cleans for the specified number of minutes')
+@cli.command(help='auto-cleans for the specified number of minutes')
 @click.argument('minutes', type=click.FLOAT)
 def clean(minutes):
     return Clean(minutes * 60)
+
+@cli.command(help='cleans room edges for the specified number of minutes')
+@click.argument('minutes', type=click.FLOAT)
+def edge(minutes):
+    return Edge(minutes * 60)
 
 
 @cli.command(help='returns to charger')
