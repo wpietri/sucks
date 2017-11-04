@@ -30,12 +30,14 @@ vacuum=[robot id]@126.ecorobot.net
 ```
 
 I got these values by using
-[xmppeek](https://www.beneaththewaves.net/Software/XMPPPeek.html) to do
+[xmpppeek](https://www.beneaththewaves.net/Software/XMPPPeek.html) to do
 a man-in-the-middle attack on the android app. You can use the included
 log_clean.py script to generate a config from a captured session. (I
 suspect that the Android app re-keys the connection on a regular basis,
 as the secret was changing regularly up until I cleared the Android
-app's data from my phone.)
+app's data from my phone.) Tip: tell your router to lie to your phone
+about the hostname msg-na.ecouser.net. I pointed that to the laptop
+where I was running xmpppeek and things went smoothly.
 
 With that set up, you could have it clean in auto mode for 10 minutes
 and return to its charger:
@@ -65,7 +67,7 @@ If it's running amok and you'd just like it to stop where it is:
     % sucks stop
 ```
 
-To tell it to go find plug in:
+To tell it to go plug in:
 
 ```
     % sucks charge
