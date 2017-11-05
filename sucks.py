@@ -26,6 +26,7 @@ class VacBot(ClientXMPP):
         self.ready_flag = Event()
         self.clean_status = None
         self.charge_status = None
+        self.battery_status = None
 
     def wait_until_ready(self):
         self.ready_flag.wait()
@@ -40,10 +41,20 @@ class VacBot(ClientXMPP):
         self.register_handler(Callback('clean report',
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="ChargeState"]'),
                                        self.handle_charge_report))
+        self.register_handler(Callback('clean report',
+                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="BatteryInfo"]'),
+                                       self.handle_battery_report))
 
     def handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
         logging.debug("*** clean_status =" + self.clean_status)
+
+    def handle_battery_report(self, iq):
+        try:
+            self.battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
+        except ValueError:
+            logging.warning("couldn't parse battery status " + ET.tostring(iq))
+        logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
 
     def handle_charge_report(self, iq):
         report = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}charge').get('type')
@@ -140,7 +151,7 @@ class Stop(VacBotCommand):
 
 class FrequencyParamType(click.ParamType):
     name = 'frequency'
-    RATIONAL_PATTERN = re.compile(r'([.0-9])/([.0-9])')
+    RATIONAL_PATTERN = re.compile(r'([.0-9]+)/([.0-9]+)')
 
     def convert(self, value, param, ctx):
         result = None
@@ -153,7 +164,7 @@ class FrequencyParamType(click.ParamType):
                     result = float(value)
                 except ValueError:
                     pass
-        except ValueError:
+        except (ValueError, ArithmeticError):
             pass
 
         if result is None:
@@ -176,10 +187,10 @@ def read_config(filename):
 
 def should_run(frequency):
     if frequency is None:
-        return
+        return True
     n = random.random()
     result = n <= frequency
-    logging.debug("tossing coin: {:0.3f} <= {:0.3f}: {}".format( n, frequency, result))
+    logging.debug("tossing coin: {:0.3f} <= {:0.3f}: {}".format(n, frequency, result))
     return result
 
 
