@@ -1,5 +1,53 @@
-The core protocol is XMPP. The Android app establishes a connection to an XMPP server and logs in using
-a secret that the android app appears to change from time to time. It then sends XMPP IQ commands. It describes
+There are two protocols involved here. There are a series of HTTPS requests
+used to log in and find devices. Once logged in, you get a token that is
+used to connect to an XMPP server, which mediates communication with the
+vacuum. That's right, your robot housecleaner, like an errant teen, spends
+all its free time hanging out in an internet chat room.
+
+This is all taken from MITMing the Android app. The protocol is quirky
+enough that I wouldn't be shocked if the iPhone app does it differently.
+
+## HTTPS
+
+There are two sorts of URLs in the basic login flow. The first set use
+a format like this:
+
+```
+    https://eco-{country}-api.ecovacs.com/v1/private/{country}/{lang}/{deviceId}/{appCode}/{appVersion}/{channel}/{deviceType}
+```
+
+They also have a complicated API request signature that seems overelaborate
+to me. See the Python code for more details.
+
+1. GET eco-us-api.ecovacs.com ... common/checkVersion - appears to just check
+the app version
+2. GET eco-us-api.ecovacs.com ... user/login - Sends encrypted versions of
+the username and password. The response is some json containing a uid and
+access token.
+3. GET eco-us-api.ecovacs.com ... user/getAuthCode - sends uid, accessToken;
+gets back an auth code
+
+Now we switch to posting to a different server, and the request and response
+style change substantially. I think of this at the user server, or perhaps
+the XMPP/device server.
+
+
+4. POST users-na.ecouser.net:8000/user.do loginByItToken - trades the
+authCode from the previous call for yet another token
+5. POST ne-na.ecouser.net:8018/notify_engine.do - not sure what this is
+for; my script skips this and seems to work fine
+6. POST users-na.ecouser.net:8000/user.do GetDeviceList - Using the token
+from step 4, gets the list of devices; that's needed for talking to the
+vacuum via XMPP
+
+
+## XMPP
+
+
+
+The Android app establishes a connection to an XMPP server and logs in using
+a secret that comes from the earlier HTTPS calls. It then sends XMPP IQ commands.
+It describes
 them as queries, but they all contain "ctl" elements that appear to be commands. Here are a couple of full
 examples with the private information removed:
 

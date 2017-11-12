@@ -1,15 +1,132 @@
 import configparser
+import hashlib
 import itertools
 import logging
 import os
 import random
 import re
 import time
+from base64 import b64decode, b64encode
+from collections import OrderedDict
 from threading import Event
 
 import click
+import requests
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
+
+
+class EcoVacsAPI:
+    CLIENT_KEY = "eJUWrzRv34qFSaYk"
+    SECRET = "Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GC"
+    PUBLIC_KEY = 'MIIB/TCCAWYCCQDJ7TMYJFzqYDANBgkqhkiG9w0BAQUFADBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMCAXDTE3MDUwOTA1MTkxMFoYDzIxMTcwNDE1MDUxOTEwWjBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDb8V0OYUGP3Fs63E1gJzJh+7iqeymjFUKJUqSD60nhWReZ+Fg3tZvKKqgNcgl7EGXp1yNifJKUNC/SedFG1IJRh5hBeDMGq0m0RQYDpf9l0umqYURpJ5fmfvH/gjfHe3Eg/NTLm7QEa0a0Il2t3Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GCSqGSIb3DQEBBQUAA4GBANhIMT0+IyJa9SU8AEyaWZZmT2KEYrjakuadOvlkn3vFdhpvNpnnXiL+cyWy2oU1Q9MAdCTiOPfXmAQt8zIvP2JC8j6yRTcxJCvBwORDyv/uBtXFxBPEC6MDfzU2gKAaHeeJUWrzRv34qFSaYkYta8canK+PSInylQTjJK9VqmjQ'
+    MAIN_URL_FORMAT = 'https://eco-{country}-api.ecovacs.com/v1/private/{country}/{lang}/{deviceId}/{appCode}/{appVersion}/{channel}/{deviceType}'
+    USER_URL = 'https://users-na.ecouser.net:8000/user.do'
+    REALM = 'ecouser.net'
+
+    def __init__(self, device_id, account_id, password_hash):
+        self.meta = {
+            'country': 'us',
+            'lang': 'en',
+            'deviceId': device_id,
+            'appCode': 'i_eco_e',
+            'appVersion': '1.3.5',
+            'channel': 'c_googleplay',
+            'deviceType': '1'
+        }
+        logging.debug("Setting up EcoVacsAPI")
+        self.resource = device_id[0:8]
+        login_info = self.__call_main_api('user/login',
+                                          ('account', self.encrypt(account_id)),
+                                          ('password', self.encrypt(password_hash)))
+        self.uid = login_info['uid']
+        self.login_access_token = login_info['accessToken']
+        self.auth_code = self.__call_main_api('user/getAuthCode',
+                                              ('uid', self.uid),
+                                              ('accessToken', self.login_access_token))['authCode']
+        self.user_access_token = self.__call_login_by_it_token()['token']
+        logging.debug("EcoVacsAPI connection complete")
+
+    def __sign(self, params):
+        result = params.copy()
+        result['authTimespan'] = int(time.time() * 1000)
+        result['authTimeZone'] = 'GMT-8'
+
+        sign_on = self.meta.copy()
+        sign_on.update(result)
+        sign_on_text = EcoVacsAPI.CLIENT_KEY + ''.join(
+            [k + '=' + str(sign_on[k]) for k in sorted(sign_on.keys())]) + EcoVacsAPI.SECRET
+
+        result['authAppkey'] = EcoVacsAPI.CLIENT_KEY
+        result['authSign'] = self.md5(sign_on_text)
+        return result
+
+    def __call_main_api(self, function, *args):
+        logging.debug("calling main api {} with {}".format(function, args))
+        params = OrderedDict(args)
+        params['requestId'] = self.md5(time.time())
+        url = (EcoVacsAPI.MAIN_URL_FORMAT + "/" + function).format(**self.meta)
+        api_response = requests.get(url, self.__sign(params))
+        json = api_response.json()
+        logging.debug("got {}".format(json))
+        if json['code'] == '0000':
+            return json['data']
+        elif json['code'] == '1005':
+            logging.warning("incorrect email or password")
+            raise ValueError("incorrect email or password")
+        else:
+            logging.error("call to {} failed with {}".format(function, json))
+            raise RuntimeError("failure code {} ({}) for call {} and parameters {}".format(
+                json['code'], json['msg'], function, args))
+
+    def __call_user_api(self, function, args):
+        logging.debug("calling user api {} with {}".format(function, args))
+        params = {'todo': function}
+        params.update(args)
+        response = requests.post(EcoVacsAPI.USER_URL, json=params)
+        json = response.json()
+        logging.debug("got {}".format(json))
+        if json['result'] == 'ok':
+            return json
+        else:
+            logging.error("call to {} failed with {}".format(function, json))
+            raise RuntimeError(
+                "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], function, params))
+
+    def __call_login_by_it_token(self):
+        return self.__call_user_api('loginByItToken',
+                                    {'country': self.meta['country'].upper(),
+                                     'resource': self.resource,
+                                     'realm': EcoVacsAPI.REALM,
+                                     'userId': self.uid,
+                                     'token': self.auth_code}
+                                    )
+
+    def devices(self):
+        devices = self.__call_user_api('GetDeviceList', {
+            'userid': self.uid,
+            'auth': {
+                'with': 'users',
+                'userid': self.uid,
+                'realm': EcoVacsAPI.REALM,
+                'token': self.user_access_token,
+                'resource': self.resource
+            }
+        })['devices']
+        return devices
+
+    @staticmethod
+    def md5(text):
+        return hashlib.md5(bytes(str(text), 'utf8')).hexdigest()
+
+    @staticmethod
+    def encrypt(text):
+        from Crypto.PublicKey import RSA
+        from Crypto.Cipher import PKCS1_v1_5
+        key = RSA.import_key(b64decode(EcoVacsAPI.PUBLIC_KEY))
+        cipher = PKCS1_v1_5.new(key)
+        result = cipher.encrypt(bytes(text, 'utf8'))
+        return str(b64encode(result), 'utf8')
 
 
 class VacBot(ClientXMPP):
@@ -73,7 +190,7 @@ class VacBot(ClientXMPP):
         c.send()
 
     def wrap_command(self, ctl):
-        q = self.make_iq_query(xmlns=u'com:ctl', ito=self.vacuum + '/atom',
+        q = self.make_iq_query(xmlns=u'com:ctl', ito=self.vacuum + '@126.ecorobot.net/atom',
                                ifrom=self.user + '@' + self.domain + '/' + self.resource)
         q['type'] = 'set'
         for child in q.xml:
@@ -178,11 +295,26 @@ class FrequencyParamType(click.ParamType):
 FREQUENCY = FrequencyParamType()
 
 
-def read_config(filename):
+def config_file():
+    return os.path.expanduser('~/.config/sucks.conf')
+
+
+def config_file_exists():
+    return os.path.isfile(config_file())
+
+
+def read_config():
     parser = configparser.ConfigParser()
-    with open(filename) as fp:
-        parser.read_file(itertools.chain(['[global]'], fp), source=filename)
+    with open(config_file()) as fp:
+        parser.read_file(itertools.chain(['[global]'], fp), source=config_file())
     return parser['global']
+
+
+def write_config(config):
+    parser = configparser.ConfigParser()
+    with open(config_file(), 'w') as fp:
+        for key in config:
+            fp.write(key + '=' + config[key] + "\n")
 
 
 def should_run(frequency):
@@ -200,6 +332,29 @@ def should_run(frequency):
 def cli(charge, debug):
     level = logging.DEBUG if debug else logging.ERROR
     logging.basicConfig(level=level, format='%(levelname)-8s %(message)s')
+
+
+@cli.command(help='logs in with specified email; run this first')
+@click.option('--email', prompt='Ecovacs app email')
+@click.option('--password', prompt='Ecovacs app password', hide_input=True)
+def login(email, password):
+    if config_file_exists() and not click.confirm('overwrite existing config?'):
+        click.echo("Skipping login.")
+        exit(0)
+    config = OrderedDict()
+    password_hash = EcoVacsAPI.md5(password)
+    device_id = EcoVacsAPI.md5(str(time.time()))
+    try:
+        EcoVacsAPI(device_id, email, password_hash)
+    except ValueError as e:
+        click.echo(e.args[0])
+        exit(1)
+    config['email'] = email
+    config['password_hash'] = password_hash
+    config['device_id'] = device_id
+    write_config(config)
+    click.echo("Config saved.")
+    exit(0)
 
 
 @cli.command(help='auto-cleans for the specified number of minutes')
@@ -234,10 +389,15 @@ def run(actions, charge, debug):
     if actions and charge and not actions[-1].terminal:
         actions.append(Charge())
 
+    if not config_file_exists():
+        click.echo("Not logged in. Do 'click login' first.")
+        exit(1)
+
     if actions:
-        config = read_config(os.path.expanduser('~/.config/sucks.conf'))
-        vacbot = VacBot(config['user'], config['domain'], config['resource'], config['secret'],
-                        config['vacuum'])
+        config = read_config()
+        api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'])
+        vacuum_id = api.devices()[0]['did']
+        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum_id)
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:

@@ -4,11 +4,11 @@ sucks
 A simple command-line python script to drive a robot vacuum. Currently
 works only with the Ecovacs Deebot N79, as that's what I have.
 
-Right now this code offered more as inspiration than something for other
-people to just download and use. But if you'd like to help flesh it out,
-send email to my first name at williampietri.com.
+This only covers my simple use case. There's a lot more it could do.
+If you'd like to help flesh it out, send email to my first name at
+williampietri.com.
 
-If you're curious about the protocol, I have [a very rough
+If you're curious about the protocol, I have [a rough
 doc](protocol.md) started. I'll happily accept pull requests for it.
 
 Why the project name? Well, a) it's ridiculous that I needed to MITM
@@ -18,26 +18,20 @@ it's a vacuum.
 
 ## Usage
 
-If you do try to use it, you'll need to create ~/.config/sucks.conf. It
-should look something like this:
+To get started, you'll need to have already set up an EcoVacs account
+using your smartphone. I've only tested this with Android, but I expect
+it will work with iPhone-created accounts as well.
 
+Step one is to log in:
 ```
-user=20170101abcdef0123456
-domain=ecouser.net
-resource=abcdef01
-secret=[long base64 string]
-vacuum=[robot id]@126.ecorobot.net
+    % sucks login
+    Ecovacs app email: [your email]
+    Ecovacs app password: [your password]
+    Config saved.
 ```
 
-I got these values by using
-[xmpppeek](https://www.beneaththewaves.net/Software/XMPPPeek.html) to do
-a man-in-the-middle attack on the android app. You can use the included
-log_clean.py script to generate a config from a captured session. (I
-suspect that the Android app re-keys the connection on a regular basis,
-as the secret was changing regularly up until I cleared the Android
-app's data from my phone.) Tip: tell your router to lie to your phone
-about the hostname msg-na.ecouser.net. I pointed that to the laptop
-where I was running xmpppeek and things went smoothly.
+That creates a config file in ~/.config.sucks.conf. The password is
+hashed before saving, so it's reasonably safe.
 
 With that set up, you could have it clean in auto mode for 10 minutes
 and return to its charger:
@@ -85,6 +79,26 @@ This means that every day at 10 am, it might do something. 4 days out
 of 7, it will do 15 minutes of automatic cleaning. 1 day out of 14,
 it will do another 10 minutes of edging. And afterward it will always
 go back to charge.
+
+
+## Thanks
+
+My heartfelt thanks to:
+
+* [xmpppeek](https://www.beneaththewaves.net/Software/XMPPPeek.html),
+a great library for examining XMPP traffic flows. (Yes, your vacuum
+speaks Jabbber!)
+* [mitmproxy](https://mitmproxy.org/), a fantastic tool for analyzing HTTPS.
+* [click](http://click.pocoo.org/), a wonderfully complete and thoughtful
+library for making Python command-line interfaces
+* [requests](http://docs.python-requests.org/en/master/), a polished Python
+library for HTTP requests, and
+* Albert Louw, who was kind enough to post code from
+[his own experiments](https://community.smartthings.com/t/ecovacs-deebot-n79/93410/33)
+with his device.
+
+
+
 
 
 ## To Do
