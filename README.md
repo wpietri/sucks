@@ -16,6 +16,12 @@ my own vacuum.  This is not the future I signed up for. There should
 be a nice, tidy RESTful API. That would be easy enough to make. And b),
 it's a vacuum.
 
+## Installation
+
+My belief, so far untested, is that you just check out this code,
+do `pipenv install`, and then call the script `sucks`. If you try,
+please let me know how it turns out.
+
 ## Usage
 
 To get started, you'll need to have already set up an EcoVacs account
@@ -68,7 +74,7 @@ To tell it to go plug in:
 ```
 
 I run mine from my crontab, but I didn't want it to clean every day,
-so it also has a mode where it randomly decide to run or not based on
+so it also has a mode where it randomly decides to run or not based on
 a frequency you give it. My crontab entry looks like this:
 
 ```

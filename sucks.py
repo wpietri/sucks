@@ -221,9 +221,9 @@ class VacBotCommand():
             time.sleep(self.wait)
 
     def to_xml(self):
-        clean = ET.Element(self.name, self.args)
         ctl = ET.Element('ctl', {'td': self.name.capitalize()})
-        ctl.append(clean)
+        inner = ET.Element(self.name, self.args)
+        ctl.append(inner)
         return ctl
 
     def __str__(self, *args, **kwargs):
