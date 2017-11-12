@@ -8,8 +8,8 @@ This only covers my simple use case. There's a lot more it could do.
 If you'd like to help flesh it out, send email to my first name at
 williampietri.com.
 
-If you're curious about the protocol, I have [a rough
-doc](protocol.md) started. I'll happily accept pull requests for it.
+If you're curious about the protocol, I have [a rough doc](protocol.md)
+started. I'll happily accept pull requests for it.
 
 Why the project name? Well, a) it's ridiculous that I needed to MITM
 my own vacuum.  This is not the future I signed up for. There should
@@ -86,15 +86,17 @@ go back to charge.
 My heartfelt thanks to:
 
 * [xmpppeek](https://www.beneaththewaves.net/Software/XMPPPeek.html),
-a great library for examining XMPP traffic flows. (Yes, your vacuum
-speaks Jabbber!)
-* [mitmproxy](https://mitmproxy.org/), a fantastic tool for analyzing HTTPS.
+a great library for examining XMPP traffic flows (yes, your vacuum
+speaks Jabbber!),
+* [mitmproxy](https://mitmproxy.org/), a fantastic tool for analyzing HTTPS,
 * [click](http://click.pocoo.org/), a wonderfully complete and thoughtful
-library for making Python command-line interfaces
+library for making Python command-line interfaces,
 * [requests](http://docs.python-requests.org/en/master/), a polished Python
-library for HTTP requests, and
-* Albert Louw, who was kind enough to post code from
-[his own experiments](https://community.smartthings.com/t/ecovacs-deebot-n79/93410/33)
+library for HTTP requests,
+* [Decompilers online](http://www.javadecompilers.com/apk), which was
+very helpful in figuring out what the Android app was up to, and
+* Albert Louw, who was kind enough to post code from [his own
+experiments](https://community.smartthings.com/t/ecovacs-deebot-n79/93410/33)
 with his device.
 
 
