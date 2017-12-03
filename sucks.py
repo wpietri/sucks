@@ -190,7 +190,7 @@ class VacBot(ClientXMPP):
         c.send()
 
     def wrap_command(self, ctl):
-        q = self.make_iq_query(xmlns=u'com:ctl', ito=self.vacuum + '@126.ecorobot.net/atom',
+        q = self.make_iq_query(xmlns=u'com:ctl', ito=self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom',
                                ifrom=self.user + '@' + self.domain + '/' + self.resource)
         q['type'] = 'set'
         for child in q.xml:
@@ -396,8 +396,8 @@ def run(actions, charge, debug):
     if actions:
         config = read_config()
         api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'])
-        vacuum_id = api.devices()[0]['did']
-        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum_id)
+        vacuum = api.devices()[0]
+        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum)
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:
