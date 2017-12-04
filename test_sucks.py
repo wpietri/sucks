@@ -6,7 +6,7 @@ from nose.tools import *
 from sucks import *
 
 
-# There are no tests for the XMPP stuff here because a) it's relatively complicated to test given
+# There are few tests for the XMPP stuff here because a) it's relatively complicated to test given
 # the library's design and its multithreaded nature, and b) I'm manually testing every change anyhow,
 # as it's not clear how the robot really behaves.
 
@@ -74,10 +74,13 @@ def test_should_run():
             count += 1
     assert_almost_equal(count, 9000, delta=200)
 
+def test_continent_for_country():
+    assert_equal(continent_for_country('us'), 'na')
+    assert_equal(continent_for_country('fr'), 'eu')
 
 def test_wrap_command():
     v = VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
-               {"did": "E0000000001234567890", "class": "126", "nick": "bob"})
+               {"did": "E0000000001234567890", "class": "126", "nick": "bob"}, 'na')
     c = str(v.wrap_command(Clean(1).to_xml()))
     assert_true(re.search(r'from="20170101abcdefabcdefa@ecouser.net/abcdef12"', c))
     assert_true(re.search(r'to="E0000000001234567890@126.ecorobot.net/atom"', c))
@@ -85,10 +88,10 @@ def test_wrap_command():
 
 def test_model_variation():
     v = VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
-               {"did": "E0000000001234567890", "class": "141", "nick": "bob"})
+               {"did": "E0000000001234567890", "class": "141", "nick": "bob"}, 'na')
     c = str(v.wrap_command(Clean(1).to_xml()))
     assert_true(re.search(r'to="E0000000001234567890@141.ecorobot.net/atom"', c))
-b
+
 
 def test_main_api_called():
     with requests_mock.mock() as m:
@@ -98,7 +101,7 @@ def test_main_api_called():
                    text='{"time": 1511200804607, "data": {"authCode": "5c28dac1ff580210e11292df57e87bef"}, "code": "0000", "msg": "X"}')
         r3 = m.post(re.compile('user.do'),
                     text='{"todo": "result", "token": "jt5O7oDR3gPHdVKCeb8Czx8xw8mDXM6s", "result": "ok", "userId": "2017102559f0ee63c588d", "resource": "f8d99c4d"}')
-        api = EcoVacsAPI("long_device_id", "account_id", "password_hash")
+        api = EcoVacsAPI("long_device_id", "account_id", "password_hash", 'us', 'na')
         assert_equals(r1.call_count, 1)
         assert_equals(r2.call_count, 1)
         assert_equals(r3.call_count, 1)
@@ -127,4 +130,4 @@ def make_api():
               text='{"time": 1511200804607, "data": {"authCode": "abcdef01234567890abcdef012345678"}, "code": "0000", "msg": "X"}')
         m.post(re.compile('user.do'),
                text='{"todo": "result", "token": "base64base64base64base64base64ba", "result": "ok", "userId": "20170101abcdefabcdefa", "resource": "abcdef12"}')
-        return EcoVacsAPI("long_device_id", "account_id", "password_hash")
+        return EcoVacsAPI("long_device_id", "account_id", "password_hash", 'us', 'na')

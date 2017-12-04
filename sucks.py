@@ -12,6 +12,7 @@ from threading import Event
 
 import click
 import requests
+from pycountry_convert import country_alpha2_to_continent_code
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
 
@@ -21,12 +22,12 @@ class EcoVacsAPI:
     SECRET = "Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GC"
     PUBLIC_KEY = 'MIIB/TCCAWYCCQDJ7TMYJFzqYDANBgkqhkiG9w0BAQUFADBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMCAXDTE3MDUwOTA1MTkxMFoYDzIxMTcwNDE1MDUxOTEwWjBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDb8V0OYUGP3Fs63E1gJzJh+7iqeymjFUKJUqSD60nhWReZ+Fg3tZvKKqgNcgl7EGXp1yNifJKUNC/SedFG1IJRh5hBeDMGq0m0RQYDpf9l0umqYURpJ5fmfvH/gjfHe3Eg/NTLm7QEa0a0Il2t3Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GCSqGSIb3DQEBBQUAA4GBANhIMT0+IyJa9SU8AEyaWZZmT2KEYrjakuadOvlkn3vFdhpvNpnnXiL+cyWy2oU1Q9MAdCTiOPfXmAQt8zIvP2JC8j6yRTcxJCvBwORDyv/uBtXFxBPEC6MDfzU2gKAaHeeJUWrzRv34qFSaYkYta8canK+PSInylQTjJK9VqmjQ'
     MAIN_URL_FORMAT = 'https://eco-{country}-api.ecovacs.com/v1/private/{country}/{lang}/{deviceId}/{appCode}/{appVersion}/{channel}/{deviceType}'
-    USER_URL = 'https://users-na.ecouser.net:8000/user.do'
+    USER_URL_FORMAT = 'https://users-{continent}.ecouser.net:8000/user.do'
     REALM = 'ecouser.net'
 
-    def __init__(self, device_id, account_id, password_hash):
+    def __init__(self, device_id, account_id, password_hash, country, continent):
         self.meta = {
-            'country': 'us',
+            'country': country,
             'lang': 'en',
             'deviceId': device_id,
             'appCode': 'i_eco_e',
@@ -36,6 +37,8 @@ class EcoVacsAPI:
         }
         logging.debug("Setting up EcoVacsAPI")
         self.resource = device_id[0:8]
+        self.country = country
+        self.continent = continent
         login_info = self.__call_main_api('user/login',
                                           ('account', self.encrypt(account_id)),
                                           ('password', self.encrypt(password_hash)))
@@ -83,7 +86,7 @@ class EcoVacsAPI:
         logging.debug("calling user api {} with {}".format(function, args))
         params = {'todo': function}
         params.update(args)
-        response = requests.post(EcoVacsAPI.USER_URL, json=params)
+        response = requests.post(EcoVacsAPI.USER_URL_FORMAT.format(continent=self.continent), json=params)
         json = response.json()
         logging.debug("got {}".format(json))
         if json['result'] == 'ok':
@@ -130,13 +133,14 @@ class EcoVacsAPI:
 
 
 class VacBot(ClientXMPP):
-    def __init__(self, user, domain, resource, secret, vacuum):
+    def __init__(self, user, domain, resource, secret, vacuum, continent):
         ClientXMPP.__init__(self, user + '@' + domain, '0/' + resource + '/' + secret)
 
         self.user = user
         self.domain = domain
         self.resource = resource
         self.vacuum = vacuum
+        self.continent = continent
         self.credentials['authzid'] = user
         self.add_event_handler("session_start", self.session_start)
 
@@ -190,7 +194,8 @@ class VacBot(ClientXMPP):
         c.send()
 
     def wrap_command(self, ctl):
-        q = self.make_iq_query(xmlns=u'com:ctl', ito=self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom',
+        q = self.make_iq_query(xmlns=u'com:ctl',
+                               ito=self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom',
                                ifrom=self.user + '@' + self.domain + '/' + self.resource)
         q['type'] = 'set'
         for child in q.xml:
@@ -199,7 +204,7 @@ class VacBot(ClientXMPP):
                 return q
 
     def connect_and_wait_until_ready(self):
-        self.connect(('47.88.66.164', '5223'))  # TODO: change to domain name
+        self.connect(('msg-{}.ecouser.net'.format(self.continent), '5223'))
         self.process()
         self.wait_until_ready()
 
@@ -317,6 +322,17 @@ def write_config(config):
             fp.write(key + '=' + config[key] + "\n")
 
 
+def current_country():
+    try:
+        return requests.get('http://ipinfo.io/json').json()['country'].lower()
+    except:
+        return 'us'
+
+
+def continent_for_country(country_code):
+    return country_alpha2_to_continent_code(country_code.upper()).lower()
+
+
 def should_run(frequency):
     if frequency is None:
         return True
@@ -337,7 +353,10 @@ def cli(charge, debug):
 @cli.command(help='logs in with specified email; run this first')
 @click.option('--email', prompt='Ecovacs app email')
 @click.option('--password', prompt='Ecovacs app password', hide_input=True)
-def login(email, password):
+@click.option('--country-code', prompt='your two-letter country code', default=lambda: current_country())
+@click.option('--continent-code', prompt='your two-letter continent code',
+              default=lambda: continent_for_country(click.get_current_context().params['country_code']))
+def login(email, password, country_code, continent_code):
     if config_file_exists() and not click.confirm('overwrite existing config?'):
         click.echo("Skipping login.")
         exit(0)
@@ -352,6 +371,8 @@ def login(email, password):
     config['email'] = email
     config['password_hash'] = password_hash
     config['device_id'] = device_id
+    config['country'] = country_code.lower()
+    config['continent'] = continent_code.lower()
     write_config(config)
     click.echo("Config saved.")
     exit(0)
@@ -395,9 +416,10 @@ def run(actions, charge, debug):
 
     if actions:
         config = read_config()
-        api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'])
+        api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
+                         config['country'], config['continent'])
         vacuum = api.devices()[0]
-        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum)
+        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:
