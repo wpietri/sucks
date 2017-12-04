@@ -364,7 +364,7 @@ def login(email, password, country_code, continent_code):
     password_hash = EcoVacsAPI.md5(password)
     device_id = EcoVacsAPI.md5(str(time.time()))
     try:
-        EcoVacsAPI(device_id, email, password_hash)
+        EcoVacsAPI(device_id, email, password_hash, country_code, continent_code)
     except ValueError as e:
         click.echo(e.args[0])
         exit(1)
