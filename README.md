@@ -2,11 +2,9 @@ sucks
 =====
 
 A simple command-line python script to drive a robot vacuum. Currently
-works only with the Ecovacs Deebot N79, as that's what I have.
-
-This only covers my simple use case. There's a lot more it could do.
-If you'd like to help flesh it out, send email to my first name at
-williampietri.com.
+known to work with the Ecovacs Deebot N79, M81, and M88 Pro from North
+America and Europe. Does it work for your model as well? Join the
+discussion on the [sucks-users mailing list](https://groups.google.com/forum/#!forum/sucks-users).
 
 If you're curious about the protocol, I have [a rough doc](protocol.md)
 started. I'll happily accept pull requests for it.
@@ -18,9 +16,8 @@ it's a vacuum.
 
 ## Installation
 
-My belief, so far untested, is that you just check out this code,
-do `pipenv install`, and then call the script `sucks`. If you try,
-please let me know how it turns out.
+Check out this code, do `pipenv install`, and then call the script
+`sucks`. If that doesn't work for you, please [open an issue](https://github.com/wpietri/sucks/issues).
 
 ## Usage
 
@@ -33,6 +30,8 @@ Step one is to log in:
     % sucks login
     Ecovacs app email: [your email]
     Ecovacs app password: [your password]
+    your two-letter country code: us
+    your two-letter contienent code: na
     Config saved.
 ```
 

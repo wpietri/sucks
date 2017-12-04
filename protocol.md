@@ -7,6 +7,15 @@ all its free time hanging out in an internet chat room.
 This is all taken from MITMing the Android app. The protocol is quirky
 enough that I wouldn't be shocked if the iPhone app does it differently.
 
+## Location
+
+It appears that Ecovacs have broken up their API servers by location. Some
+are designated by country, others by continent. All appear to use the
+two-letter ISO codes, but at this time it doesn't look like all codes
+map to valid servers. If you're in, say, Australia and are trying to
+get this to work, I'd love a packet capture of DNS requests to see what
+the app does there.
+
 ## HTTPS
 
 There are two sorts of URLs in the basic login flow. The first set use
@@ -54,13 +63,13 @@ examples with the private information removed:
 
 A clean command:
 ```
-<iq id="TXID" to="ROBOTID@126.ecorobot.net/atom" from="USERID@ecouser.net/RESOURCEID" type="set"><query xmlns="com:ctl"><ctl td="Clean"><clean type="auto" speed="standard"/></ctl></query></iq>
+<iq id="TXID" to="ROBOTID@MODELID.ecorobot.net/atom" from="USERID@ecouser.net/RESOURCEID" type="set"><query xmlns="com:ctl"><ctl td="Clean"><clean type="auto" speed="standard"/></ctl></query></iq>
 
 ```
 
 A charge command:
 ```
-<iq id="TXID" to="ROBOTID@126.ecorobot.net/atom" from="USERID@ecouser.net/RESOURCEID" type="set"><query xmlns="com:ctl"><ctl td="Charge"><charge type="go"/></ctl></query></iq>
+<iq id="TXID" to="ROBOTID@MODELID.ecorobot.net/atom" from="USERID@ecouser.net/RESOURCEID" type="set"><query xmlns="com:ctl"><ctl td="Charge"><charge type="go"/></ctl></query></iq>
 ```
 
 Focusing on the core ctl elements, this is a sampling of commands seen on the wire after punching all the app buttons:
