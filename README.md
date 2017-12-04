@@ -19,8 +19,9 @@ it's a vacuum.
 
 ## Installation
 
-Check out this code, do `pipenv install`, and then call the script
-`sucks`. If that doesn't work for you, please [open an issue](https://github.com/wpietri/sucks/issues).
+Check out this code, possibly create a virtualenv, and do
+`pip install pipenv; pip install -e .`. If that doesn't work for
+you, please [open an issue](https://github.com/wpietri/sucks/issues).
 
 ## Usage
 
@@ -55,12 +56,10 @@ of edging:
     % sucks clean 15 edge 10
 ```
 
-If you wanted it to clean for 5 minutes and then stop where it was,
-either of these would work:
+If you wanted it to clean for 5 minutes and then stop without charging:
 
 ```
     % sucks clean 5 stop
-    % sucks --no-charge clean 5
 ```
 
 If it's running amok and you'd just like it to stop where it is:
@@ -85,8 +84,40 @@ a frequency you give it. My crontab entry looks like this:
 
 This means that every day at 10 am, it might do something. 4 days out
 of 7, it will do 15 minutes of automatic cleaning. 1 day out of 14,
-it will do another 10 minutes of edging. And afterward it will always
-go back to charge.
+it will do 10 minutes of edging. And afterward it will always go back to
+charge.
+
+## Library use
+
+You are welcome to try using this as a python library for other efforts. The
+API is still experimental, so expect changes. Please join the [mailing
+list](https://groups.google.com/forum/#!forum/sucks-users) to participate in
+shaping the API.
+
+A simple usage might go something like this:
+
+```
+include sucks
+
+config = ...
+
+api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
+                         config['country'], config['continent'])
+my_vac = api.devices()[0]
+vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, my_vac, config['continent'])
+vacbot.connect_and_wait_until_ready()
+
+vacbot.run(Clean(900)) # clean for 15 minutes
+vacbot.run(Charge()) # return to the charger
+```
+
+## Developing
+
+If you'd like to join in on developing, I recommend checking out the code,
+doing `pipenv install` to set up a virtual environment, and then `pipenv shell`
+to start using it. You can run the existing tests using `nosetests`. Current
+test are not yet comprehensive, as the integrated nature of this makes it difficult.
+But I aim to reduce that problem over time, so please add tests as you go.
 
 
 ## Thanks
@@ -102,10 +133,12 @@ library for making Python command-line interfaces,
 * [requests](http://docs.python-requests.org/en/master/), a polished Python
 library for HTTP requests,
 * [Decompilers online](http://www.javadecompilers.com/apk), which was
-very helpful in figuring out what the Android app was up to, and
+very helpful in figuring out what the Android app was up to,
 * Albert Louw, who was kind enough to post code from [his own
 experiments](https://community.smartthings.com/t/ecovacs-deebot-n79/93410/33)
-with his device.
+with his device, and
+* All the users who have given useful feedback and reported on how it is
+working for them.
 
 
 
