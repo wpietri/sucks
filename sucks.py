@@ -154,15 +154,16 @@ class VacBot(ClientXMPP):
 
     def session_start(self, event):
         logging.debug("----------------- starting session ----------------")
+        logging.debug("event = {}".format(event))
         self.ready_flag.set()
 
         self.register_handler(Callback('clean report',
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="CleanReport"]'),
                                        self.handle_clean_report))
-        self.register_handler(Callback('clean report',
+        self.register_handler(Callback('charge state',
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="ChargeState"]'),
                                        self.handle_charge_report))
-        self.register_handler(Callback('clean report',
+        self.register_handler(Callback('battery info',
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="BatteryInfo"]'),
                                        self.handle_battery_report))
 
@@ -213,7 +214,7 @@ class VacBot(ClientXMPP):
         action.wait_for_completion(self)
 
 
-class VacBotCommand():
+class VacBotCommand:
     def __init__(self, name, args, wait=None, terminal=False):
         self.name = name
         self.args = args
@@ -316,13 +317,13 @@ def read_config():
 
 
 def write_config(config):
-    parser = configparser.ConfigParser()
     with open(config_file(), 'w') as fp:
         for key in config:
             fp.write(key + '=' + config[key] + "\n")
 
 
 def current_country():
+    # noinspection PyBroadException
     try:
         return requests.get('http://ipinfo.io/json').json()['country'].lower()
     except:
@@ -413,6 +414,9 @@ def run(actions, charge, debug):
     if not config_file_exists():
         click.echo("Not logged in. Do 'click login' first.")
         exit(1)
+
+    if debug:
+        logging.debug("will run {}".format(actions))
 
     if actions:
         config = read_config()
