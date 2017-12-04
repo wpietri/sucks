@@ -1,7 +1,6 @@
 Linux: [![Build Status](https://travis-ci.org/wpietri/sucks.svg?branch=master)](https://travis-ci.org/wpietri/sucks)
 Windows: [![Build Status](https://ci.appveyor.com/api/projects/status/github/wpietri/sucks)](https://ci.appveyor.com/project/wpietri/sucks)
 
-https://ci.appveyor.com/api/projects/status/{github|bitbucket}/{repository}
 
 sucks
 =====
