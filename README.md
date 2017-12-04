@@ -2,9 +2,12 @@ sucks
 =====
 
 A simple command-line python script to drive a robot vacuum. Currently
-known to work with the Ecovacs Deebot N79, M81, and M88 Pro from North
-America and Europe. Does it work for your model as well? Join the
-discussion on the [sucks-users mailing list](https://groups.google.com/forum/#!forum/sucks-users).
+known to work with the Ecovacs Deebot N79, M80 Pro, M81, and M88
+Pro from both North America and Europe.
+
+Does it work for your model as well? Join the discussion on the
+[sucks-users mailing
+list](https://groups.google.com/forum/#!forum/sucks-users).
 
 If you're curious about the protocol, I have [a rough doc](protocol.md)
 started. I'll happily accept pull requests for it.
