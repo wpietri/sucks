@@ -155,12 +155,14 @@ class VacBot(ClientXMPP):
         self.__register_callback("BatteryInfo", self.handle_battery_report)
         self.__register_callback("error", self.handle_error)
 
+        self.schedule('Ping', 30, self.send_ping, repeat=True)
+
+
     def __register_callback(self, kind, function):
         self.register_handler(Callback(kind,
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="' + kind + '"]'),
                                        function))
 
-        self.schedule('Ping', 30, self.send_ping, repeat=True)
 
     def handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
