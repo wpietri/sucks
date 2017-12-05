@@ -7,7 +7,7 @@ from sucks.cli import *
 def test_config_file_name():
     if platform.system() == 'Windows':
         print(config_file())
-        assert_true(re.match(r'[A-Z]:\\.+\\\w+\\AppData\\sucks.conf', config_file()))
+        assert_true(re.match(r'[A-Z]:\\.+\\\w+\\AppData(\\Roaming)?\\sucks.conf', config_file()))
     else:
         assert_true(re.match(r'/.+/\w+/.config/sucks.conf', config_file()))
 
