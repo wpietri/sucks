@@ -142,6 +142,8 @@ class VacBot(ClientXMPP):
         self.clean_status = None
         self.charge_status = None
         self.battery_status = None
+        self.error = None
+        self.error_no = None
 
     def wait_until_ready(self):
         self.ready_flag.wait()
@@ -160,6 +162,10 @@ class VacBot(ClientXMPP):
         self.register_handler(Callback('battery info',
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="BatteryInfo"]'),
                                        self.handle_battery_report))
+        self.register_handler(Callback('error',
+                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="error"]'),
+                                       self.handle_error))
+
 
     def handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
@@ -183,6 +189,11 @@ class VacBot(ClientXMPP):
         else:
             logging.warning("Unknown charging status '" + report + "'")
         logging.debug("*** charge_status =" + self.charge_status)
+
+    def handle_error(self, iq):
+        self.error = iq.find('{com:ctl}query/{com:ctl}ctl').get('error')
+        self.error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
+        logging.debug("*** error =" + self.error_no + " " + self.error)
 
     def send_command(self, xml):
         c = self.wrap_command(xml)
