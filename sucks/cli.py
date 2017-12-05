@@ -58,9 +58,10 @@ def read_config():
 
 
 def write_config(config):
+    os.makedirs(os.path.dirname(config_file()), exist_ok=True)
     with open(config_file(), 'w') as fp:
         for key in config:
-            fp.write(key + '=' + config[key] + "\n")
+            fp.write(key + '=' + str(config[key]) + "\n")
 
 
 def current_country():

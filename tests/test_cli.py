@@ -1,3 +1,6 @@
+import tempfile
+from unittest.mock import Mock, patch
+
 import requests_mock
 from nose.tools import *
 
@@ -12,11 +15,12 @@ def test_config_file_name():
         assert_true(re.match(r'/.+/\w+/.config/sucks.conf', config_file()))
 
 
-# def test_write_and_read_config():
-#     config1 = {'a':1, 'b':2}
-#     write_config(config1)
-#     config2 = read_config()
-#     assert_equals(config1, config2)
+def test_write_and_read_config():
+    with patch('sucks.cli.config_file', Mock(return_value=os.path.join(tempfile.mkdtemp(), 'some_other_dir', 'sucks.conf'))):
+        write_config({'a': "ayyy", 'b': 2})
+        config2 = read_config()
+        assert_equals(config2['a'], 'ayyy')
+        assert_equals(config2['b'], '2')
 
 def test_frequency_param_type():
     t = FREQUENCY
