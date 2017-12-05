@@ -141,9 +141,6 @@ class VacBot(ClientXMPP):
         self.ready_flag = Event()
         self.clean_status = None
         self.charge_status = None
-        self.battery_status = None
-        self.error = None
-        self.error_no = None
 
     def wait_until_ready(self):
         self.ready_flag.wait()
@@ -153,30 +150,26 @@ class VacBot(ClientXMPP):
         logging.debug("event = {}".format(event))
         self.ready_flag.set()
 
-        self.register_handler(Callback('clean report',
-                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="CleanReport"]'),
-                                       self.handle_clean_report))
-        self.register_handler(Callback('charge state',
-                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="ChargeState"]'),
-                                       self.handle_charge_report))
-        self.register_handler(Callback('battery info',
-                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="BatteryInfo"]'),
-                                       self.handle_battery_report))
-        self.register_handler(Callback('error',
-                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="error"]'),
-                                       self.handle_error))
+        self.__register_callback("CleanReport", self.handle_clean_report)
+        self.__register_callback("ChargeState", self.handle_charge_report)
+        self.__register_callback("BatteryInfo", self.handle_battery_report)
+        self.__register_callback("error", self.handle_error)
 
+    def __register_callback(self, kind, function):
+        self.register_handler(Callback(kind,
+                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="' + kind + '"]'),
+                                       function))
 
     def handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
-        logging.debug("*** clean_status =" + self.clean_status)
+        logging.debug("*** clean_status = " + self.clean_status)
 
     def handle_battery_report(self, iq):
         try:
-            self.battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
+            battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
+            logging.debug("*** battery_status = {:.0%}".format(battery_status))
         except ValueError:
             logging.warning("couldn't parse battery status " + ET.tostring(iq))
-        logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
 
     def handle_charge_report(self, iq):
         report = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}charge').get('type')
@@ -188,12 +181,12 @@ class VacBot(ClientXMPP):
             self.charge_status = 'idle'
         else:
             logging.warning("Unknown charging status '" + report + "'")
-        logging.debug("*** charge_status =" + self.charge_status)
+        logging.debug("*** charge_status = " + self.charge_status)
 
     def handle_error(self, iq):
-        self.error = iq.find('{com:ctl}query/{com:ctl}ctl').get('error')
-        self.error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
-        logging.debug("*** error =" + self.error_no + " " + self.error)
+        error = iq.find('{com:ctl}query/{com:ctl}ctl').get('error')
+        error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
+        logging.debug("*** error = " + error_no + " " + error)
 
     def send_command(self, xml):
         c = self.wrap_command(xml)
