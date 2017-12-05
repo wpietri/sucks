@@ -160,6 +160,8 @@ class VacBot(ClientXMPP):
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="' + kind + '"]'),
                                        function))
 
+        self.schedule('Ping', 30, self.send_ping, repeat=True)
+
     def handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
         logging.debug("*** clean_status = " + self.clean_status)
@@ -201,6 +203,13 @@ class VacBot(ClientXMPP):
             if child.tag.endswith('query'):
                 child.append(ctl)
                 return q
+
+    def send_ping(self):
+        q = self.make_iq_get(ito=self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom',
+                             ifrom=self.user + '@' + self.domain + '/' + self.resource)
+        logging.debug("*** sending ping ***")
+        q.xml.append(ET.Element('ping', {'xmlns':'urn:xmpp:ping'}))
+        q.send()
 
     def connect_and_wait_until_ready(self):
         self.connect(('msg-{}.ecouser.net'.format(self.continent), '5223'))
