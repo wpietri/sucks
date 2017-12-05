@@ -195,9 +195,7 @@ class VacBot(ClientXMPP):
         c.send()
 
     def wrap_command(self, ctl):
-        q = self.make_iq_query(xmlns=u'com:ctl',
-                               ito=self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom',
-                               ifrom=self.user + '@' + self.domain + '/' + self.resource)
+        q = self.make_iq_query(xmlns=u'com:ctl', ito=self.__vacuum_adress(), ifrom=self.__my_address())
         q['type'] = 'set'
         for child in q.xml:
             if child.tag.endswith('query'):
@@ -205,11 +203,16 @@ class VacBot(ClientXMPP):
                 return q
 
     def send_ping(self):
-        q = self.make_iq_get(ito=self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom',
-                             ifrom=self.user + '@' + self.domain + '/' + self.resource)
+        q = self.make_iq_get(ito=self.__vacuum_adress(), ifrom=self.__my_address())
+        q.xml.append(ET.Element('ping', {'xmlns': 'urn:xmpp:ping'}))
         logging.debug("*** sending ping ***")
-        q.xml.append(ET.Element('ping', {'xmlns':'urn:xmpp:ping'}))
         q.send()
+
+    def __my_address(self):
+        return self.user + '@' + self.domain + '/' + self.resource
+
+    def __vacuum_adress(self):
+        return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
 
     def connect_and_wait_until_ready(self):
         self.connect(('msg-{}.ecouser.net'.format(self.continent), '5223'))
