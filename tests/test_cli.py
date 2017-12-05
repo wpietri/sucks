@@ -4,6 +4,20 @@ from nose.tools import *
 from sucks.cli import *
 
 
+def test_config_file_name():
+    if platform.system() == 'Windows':
+        print(config_file())
+        assert_true(re.match(r'[A-Z]:\\.+\\\w+\\AppData\\sucks.conf', config_file()))
+    else:
+        assert_true(re.match(r'/.+/\w+/.config/sucks.conf', config_file()))
+
+
+# def test_write_and_read_config():
+#     config1 = {'a':1, 'b':2}
+#     write_config(config1)
+#     config2 = read_config()
+#     assert_equals(config1, config2)
+
 def test_frequency_param_type():
     t = FREQUENCY
     assert_equals(t.convert('0', None, None), 0)
