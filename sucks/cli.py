@@ -1,6 +1,7 @@
 import configparser
 import itertools
 import os
+import platform
 import random
 import re
 
@@ -39,7 +40,10 @@ FREQUENCY = FrequencyParamType()
 
 
 def config_file():
-    return os.path.expanduser('~/.config/sucks.conf')
+    if platform.system() == 'Windows':
+        return os.path.join(os.getenv('APPDATA'), 'sucks.conf')
+    else:
+        return os.path.expanduser('~/.config/sucks.conf')
 
 
 def config_file_exists():
