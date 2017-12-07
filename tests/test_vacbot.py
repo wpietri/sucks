@@ -29,6 +29,8 @@ def test_edge_command():
 
 def test_charge_command():
     c = Charge()
+    assert_equals(c.terminal, False)
+    c = Charge(terminal=True)
     assert_equals(c.terminal, True)
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Charge"><charge type="go" /></ctl>')
@@ -36,7 +38,7 @@ def test_charge_command():
 
 def test_stop_command():
     c = Stop()
-    assert_equals(c.terminal, True)
+    assert_equals(c.terminal, False)
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Clean"><clean speed="standard" type="stop" /></ctl>')
 
