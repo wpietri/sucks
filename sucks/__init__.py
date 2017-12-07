@@ -5,7 +5,6 @@ from base64 import b64decode, b64encode
 from collections import OrderedDict
 from threading import Event
 
-import click
 import requests
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
@@ -141,6 +140,7 @@ class VacBot(ClientXMPP):
         self.ready_flag = Event()
         self.clean_status = None
         self.charge_status = None
+        self.battery_status = None
 
     def wait_until_ready(self):
         self.ready_flag.wait()
@@ -164,14 +164,23 @@ class VacBot(ClientXMPP):
                                        function))
 
 
+    def on_state_change(self):
+        pass
+
+    def on_error(self, error_no):
+        pass
+
     def handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
         logging.debug("*** clean_status = " + self.clean_status)
+        self.on_state_change()
 
     def handle_battery_report(self, iq):
         try:
             battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
             logging.debug("*** battery_status = {:.0%}".format(battery_status))
+            self.battery_status = battery_status
+            self.on_state_change()
         except ValueError:
             logging.warning("couldn't parse battery status " + ET.tostring(iq))
 
@@ -186,11 +195,13 @@ class VacBot(ClientXMPP):
         else:
             logging.warning("Unknown charging status '" + report + "'")
         logging.debug("*** charge_status = " + self.charge_status)
+        self.on_state_change()
 
     def handle_error(self, iq):
         error = iq.find('{com:ctl}query/{com:ctl}ctl').get('error')
         error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
         logging.debug("*** error = " + error_no + " " + error)
+        self.on_error(error_no)
 
     def send_command(self, xml):
         c = self.wrap_command(xml)
@@ -223,7 +234,6 @@ class VacBot(ClientXMPP):
 
     def run(self, action):
         self.send_command(action.to_xml())
-        action.wait_for_completion(self)
 
 
 class VacBotCommand:
@@ -232,11 +242,6 @@ class VacBotCommand:
         self.args = args
         self.wait = wait
         self.terminal = terminal
-
-    def wait_for_completion(self, bot):
-        if self.wait:
-            click.echo("waiting in " + self.command_name() + " for " + str(self.wait) + "s")
-            time.sleep(self.wait)
 
     def to_xml(self):
         ctl = ET.Element('ctl', {'td': self.name.capitalize()})
@@ -250,35 +255,22 @@ class VacBotCommand:
     def command_name(self):
         return self.__class__.__name__.lower()
 
-
 class Clean(VacBotCommand):
-    def __init__(self, wait):
-        super().__init__('clean', {'type': 'auto', 'speed': 'standard'}, wait)
-
+    def __init__(self, wait=None):
+        super().__init__('clean', {'type': 'auto', 'speed': 'standard'}, wait=wait)
 
 class Edge(VacBotCommand):
-    def __init__(self, wait):
-        super().__init__('clean', {'type': 'border', 'speed': 'strong'}, wait)
+    def __init__(self, wait=None):
+        super().__init__('clean', {'type': 'border', 'speed': 'strong'}, wait=wait)
 
+class Move(VacBotCommand):
+    def __init__(self, direction):
+        super().__init__('move', {'action': direction})
 
 class Charge(VacBotCommand):
-    def __init__(self):
-        super().__init__('charge', {'type': 'go'}, terminal=True)
-
-    def wait_for_completion(self, bot):
-        logging.debug("waiting in " + self.name)
-        while bot.charge_status not in ['charging']:
-            time.sleep(0.5)
-        logging.debug("done waiting in " + self.name)
-        click.echo("docked")
-
+    def __init__(self, terminal=False):
+        super().__init__('charge', {'type': 'go'}, terminal=terminal)
 
 class Stop(VacBotCommand):
     def __init__(self):
-        super().__init__('clean', {'type': 'stop', 'speed': 'standard'}, terminal=True)
-
-    def wait_for_completion(self, bot):
-        logging.debug("waiting in " + self.name)
-        while bot.clean_status not in ['stop']:
-            time.sleep(0.5)
-        logging.debug("done waiting in " + self.name)
+        super().__init__('clean', {'type': 'stop', 'speed': 'standard'})

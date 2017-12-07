@@ -3,6 +3,7 @@ import itertools
 import os
 import random
 import re
+import click
 
 from pycountry_convert import country_alpha2_to_continent_code
 
@@ -133,7 +134,7 @@ def edge(frequency, minutes):
 
 @cli.command(help='returns to charger')
 def charge():
-    return Charge()
+    return Charge(terminal=True)
 
 
 @cli.command(help='stops the robot in its current position')
@@ -165,6 +166,9 @@ def run(actions, debug):
         for action in actions:
             click.echo("performing " + str(action))
             vacbot.run(action)
+            if(action.wait):
+                click.echo("waiting in " + action.command_name() + " for " + str(action.wait) + "s")
+                time.sleep(action.wait)
 
         vacbot.disconnect(wait=True)
 
