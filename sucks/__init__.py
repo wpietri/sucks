@@ -242,7 +242,7 @@ class VacBotCommand:
     def to_xml(self):
         ctl = ET.Element('ctl', {'td': self.name})
         if self.args:
-            inner = ET.Element(self.name, self.args)
+            inner = ET.Element(self.name.lower(), self.args)
             ctl.append(inner)
         return ctl
 
