@@ -195,6 +195,7 @@ class VacBot(ClientXMPP):
 
     def send_command(self, xml):
         c = self.wrap_command(xml)
+        logging.debug('Sending command {0}'.format(c))
         c.send()
 
     def wrap_command(self, ctl):
@@ -228,7 +229,7 @@ class VacBot(ClientXMPP):
 
 
 class VacBotCommand:
-    def __init__(self, name, args, wait=None, terminal=False):
+    def __init__(self, name, args=None, wait=None, terminal=False):
         self.name = name
         self.args = args
         self.wait = wait
@@ -240,9 +241,10 @@ class VacBotCommand:
             time.sleep(self.wait)
 
     def to_xml(self):
-        ctl = ET.Element('ctl', {'td': self.name.capitalize()})
-        inner = ET.Element(self.name, self.args)
-        ctl.append(inner)
+        ctl = ET.Element('ctl', {'td': self.name})
+        if self.args:
+            inner = ET.Element(self.name.lower(), self.args)
+            ctl.append(inner)
         return ctl
 
     def __str__(self, *args, **kwargs):
@@ -254,17 +256,17 @@ class VacBotCommand:
 
 class Clean(VacBotCommand):
     def __init__(self, wait):
-        super().__init__('clean', {'type': 'auto', 'speed': 'standard'}, wait)
+        super().__init__('Clean', {'type': 'auto', 'speed': 'standard'}, wait)
 
 
 class Edge(VacBotCommand):
     def __init__(self, wait):
-        super().__init__('clean', {'type': 'border', 'speed': 'strong'}, wait)
+        super().__init__('Clean', {'type': 'border', 'speed': 'strong'}, wait)
 
 
 class Charge(VacBotCommand):
     def __init__(self):
-        super().__init__('charge', {'type': 'go'}, terminal=True)
+        super().__init__('Charge', {'type': 'go'}, terminal=True)
 
     def wait_for_completion(self, bot):
         logging.debug("waiting in " + self.name)
@@ -276,7 +278,7 @@ class Charge(VacBotCommand):
 
 class Stop(VacBotCommand):
     def __init__(self):
-        super().__init__('clean', {'type': 'stop', 'speed': 'standard'}, terminal=True)
+        super().__init__('Clean', {'type': 'stop', 'speed': 'standard'}, terminal=True)
 
     def wait_for_completion(self, bot):
         logging.debug("waiting in " + self.name)

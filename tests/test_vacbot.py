@@ -10,6 +10,20 @@ from sucks import *
 # the library's design and its multithreaded nature, and b) I'm manually testing every change anyhow,
 # as it's not clear how the robot really behaves.
 
+def test_custom_command():
+    # Ensure a custom-built command generates the expected XML payload
+    c = VacBotCommand('CustomCommand', {'type': 'customtype'})
+    assert_equals(ElementTree.tostring(c.to_xml()),
+
+                  b'<ctl td="CustomCommand"><customcommand type="customtype" /></ctl>')
+
+def test_custom_command_noargs():
+    # Ensure a custom-built command with no args generates XML without an args element
+    c = VacBotCommand('CustomCommand')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl td="CustomCommand" />')
+
+
 def test_clean_command():
     c = Clean(10)
     assert_equals(c.terminal, False)
