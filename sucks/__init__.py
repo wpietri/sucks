@@ -141,6 +141,7 @@ class VacBot(ClientXMPP):
         self.ready_flag = Event()
         self.clean_status = None
         self.charge_status = None
+        self.battery_status = None
 
     def wait_until_ready(self):
         self.ready_flag.wait()
@@ -170,8 +171,8 @@ class VacBot(ClientXMPP):
 
     def handle_battery_report(self, iq):
         try:
-            battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
-            logging.debug("*** battery_status = {:.0%}".format(battery_status))
+            self.battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
+            logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
         except ValueError:
             logging.warning("couldn't parse battery status " + ET.tostring(iq))
 
