@@ -123,6 +123,8 @@ to start using it. You can run the existing tests using `nosetests`. Current
 test are not yet comprehensive, as the integrated nature of this makes it difficult.
 But I aim to reduce that problem over time, so please add tests as you go.
 
+For more information see [the development documentation](developing.md)
+
 
 ## Thanks
 
