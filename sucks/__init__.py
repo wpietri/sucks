@@ -11,6 +11,29 @@ from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
 
 
+class Subscriber:
+    def __init__(self, name):
+        self.name = name
+    def update(self, event, value):
+        print('observer {} event {} value {}'.format(self.name, event, value))
+
+class Publisher:
+    def __init__(self, events):
+        self.events = { event : dict()
+                          for event in events }
+    def get_subscribers(self, event):
+        return self.events[event]
+    def register(self, event, who, callback=None):
+        if callback == None:
+            callback = getattr(who, 'update')
+        self.get_subscribers(event)[who] = callback
+    def unregister(self, event, who):
+        del self.get_subscribers(event)[who]
+    def dispatch(self, event, value):
+        for subscriber, callback in self.get_subscribers(event).items():
+            callback(event, value)
+
+
 class EcoVacsAPI:
     CLIENT_KEY = "eJUWrzRv34qFSaYk"
     SECRET = "Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GC"
@@ -126,9 +149,10 @@ class EcoVacsAPI:
         return str(b64encode(result), 'utf8')
 
 
-class VacBot(ClientXMPP):
+class VacBot(ClientXMPP, Publisher):
     def __init__(self, user, domain, resource, secret, vacuum, continent):
         ClientXMPP.__init__(self, user + '@' + domain, '0/' + resource + '/' + secret)
+        Publisher.__init__(self, ['error', 'battery_status', 'clean_status', 'charge_status'])
 
         self.user = user
         self.domain = domain
@@ -168,11 +192,13 @@ class VacBot(ClientXMPP):
     def handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
         logging.debug("*** clean_status = " + self.clean_status)
+        self.dispatch('clean_status', self.clean_status)
 
     def handle_battery_report(self, iq):
         try:
             self.battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
             logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
+            self.dispatch('battery_status', self.battery_status)
         except ValueError:
             logging.warning("couldn't parse battery status " + ET.tostring(iq))
 
@@ -187,11 +213,13 @@ class VacBot(ClientXMPP):
         else:
             logging.warning("Unknown charging status '" + report + "'")
         logging.debug("*** charge_status = " + self.charge_status)
+        self.dispatch('charge_status', self.charge_status)
 
     def handle_error(self, iq):
         error = iq.find('{com:ctl}query/{com:ctl}ctl').get('error')
         error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
         logging.debug("*** error = " + error_no + " " + error)
+        self.dispatch('error', error_no)
 
     def send_command(self, xml):
         c = self.wrap_command(xml)
