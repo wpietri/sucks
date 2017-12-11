@@ -5,7 +5,6 @@ from base64 import b64decode, b64encode
 from collections import OrderedDict
 from threading import Event
 
-import click
 import requests
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
@@ -225,25 +224,26 @@ class VacBot(ClientXMPP):
 
     def run(self, action):
         self.send_command(action.to_xml())
-        action.wait_for_completion(self)
 
 
 class VacBotCommand:
-    def __init__(self, name, args=None, wait=None, terminal=False):
+    def __init__(self, name, outer_args=None, inner_args=None, inner_name=None, wait=None, terminal=False):
         self.name = name
-        self.args = args
+        self.outer_args = outer_args
+        self.inner_args = inner_args
+        self.inner_name = inner_name
         self.wait = wait
         self.terminal = terminal
 
-    def wait_for_completion(self, bot):
-        if self.wait:
-            click.echo("waiting in " + self.command_name() + " for " + str(self.wait) + "s")
-            time.sleep(self.wait)
-
     def to_xml(self):
         ctl = ET.Element('ctl', {'td': self.name})
-        if self.args:
-            inner = ET.Element(self.name.lower(), self.args)
+        if(self.outer_args):
+            for key, value in self.outer_args.items():
+                ctl.set(key, value)
+        if(self.inner_args):
+            if not self.inner_name:
+                self.inner_name = self.name.lower()
+            inner = ET.Element(self.inner_name, self.inner_args)
             ctl.append(inner)
         return ctl
 
@@ -253,35 +253,50 @@ class VacBotCommand:
     def command_name(self):
         return self.__class__.__name__.lower()
 
-
 class Clean(VacBotCommand):
-    def __init__(self, wait):
-        super().__init__('Clean', {'type': 'auto', 'speed': 'standard'}, wait)
-
+    def __init__(self, wait=None):
+        super().__init__('Clean', inner_args={'type': 'auto', 'speed': 'standard'}, wait=wait)
 
 class Edge(VacBotCommand):
-    def __init__(self, wait):
-        super().__init__('Clean', {'type': 'border', 'speed': 'strong'}, wait)
+    def __init__(self, wait=None):
+        super().__init__('Clean', inner_args={'type': 'border', 'speed': 'strong'}, wait=wait)
 
+class Spot(VacBotCommand):
+    def __init__(self, wait=None):
+        super().__init__('Clean', inner_args={'type': 'spot', 'speed': 'strong'}, wait=wait)
 
 class Charge(VacBotCommand):
-    def __init__(self):
-        super().__init__('Charge', {'type': 'go'}, terminal=True)
-
-    def wait_for_completion(self, bot):
-        logging.debug("waiting in " + self.name)
-        while bot.charge_status not in ['charging']:
-            time.sleep(0.5)
-        logging.debug("done waiting in " + self.name)
-        click.echo("docked")
-
+    def __init__(self, terminal=False):
+        super().__init__('Charge', inner_args={'type': 'go'}, terminal=terminal)
 
 class Stop(VacBotCommand):
-    def __init__(self):
-        super().__init__('Clean', {'type': 'stop', 'speed': 'standard'}, terminal=True)
+    def __init__(self, wait=None):
+        super().__init__('Clean', inner_args={'type': 'stop', 'speed': 'standard'}, wait=wait)
 
-    def wait_for_completion(self, bot):
-        logging.debug("waiting in " + self.name)
-        while bot.clean_status not in ['stop']:
-            time.sleep(0.5)
-        logging.debug("done waiting in " + self.name)
+class Move(VacBotCommand):
+    def __init__(self, direction):
+        super().__init__('Move', inner_args={'action': direction})
+
+class GetCleanState(VacBotCommand):
+    def __init__(self):
+        super().__init__('GetCleanState')
+
+class GetChargeState(VacBotCommand):
+    def __init__(self):
+        super().__init__('GetChargeState')
+
+class GetBatteryInfo(VacBotCommand):
+    def __init__(self):
+        super().__init__('GetBatteryInfo')
+
+class GetLifeSpan(VacBotCommand):
+    def __init__(self, component):
+        super().__init__('GetLifeSpan', outer_args={'type':component})
+
+class GetTime(VacBotCommand):
+    def __init__(self):
+        super().__init__('GetTime')
+
+class SetTime(VacBotCommand):
+    def __init__(self, time, time_zone):
+        super().__init__('SetTime', inner_args={'t':time, 'tz':time_zone}, inner_name='time')
