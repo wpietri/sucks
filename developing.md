@@ -7,9 +7,9 @@ For a description of the Ecovacs API protocols, see
 ## Getting started with Sucks
 
 If you'd like to join in on developing, I recommend checking out the code,
-doing `pipenv install` to set up a virtual environment, and then `pipenv shell`
-to start using it. You can run the existing tests using `nosetests`. Current
-test are not yet comprehensive, as the integrated nature of this makes it difficult.
+setting up a virtual environment, and doing `pip install -e .`. You can
+run the existing tests using `nosetests`. Current test are not yet
+comprehensive, as the integrated nature of this makes it difficult.
 But I aim to reduce that problem over time, so please add tests as you go.
 
 
