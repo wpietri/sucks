@@ -13,7 +13,7 @@ Does it work for your model as well? Join the discussion on the
 [sucks-users mailing
 list](https://groups.google.com/forum/#!forum/sucks-users).
 
-If you're curious about the protocol, I have [a rough doc](protocol.md)
+If you're curious about the protocol, I have [a rough doc](http://github.com/wpietri/sucks/blob/master/protocol.md)
 started. I'll happily accept pull requests for it.
 
 Why the project name? Well, a) it's ridiculous that I needed to MITM
@@ -23,15 +23,14 @@ it's a vacuum.
 
 ## Installation
 
-Check out this code, possibly create a virtualenv, and do
-`pip install pipenv; pip install -e .`. If that doesn't work for
-you, please [open an issue](https://github.com/wpietri/sucks/issues).
+If you have a recent version of python, you should be able to
+do `pip install sucks` to get the most recently released version of
+this.
 
 ## Usage
 
 To get started, you'll need to have already set up an EcoVacs account
-using your smartphone. I've only tested this with Android, but I expect
-it will work with iPhone-created accounts as well.
+using your smartphone.
 
 Step one is to log in:
 ```
@@ -44,7 +43,8 @@ Step one is to log in:
 ```
 
 That creates a config file in ~/.config.sucks.conf. The password is
-hashed before saving, so it's reasonably safe.
+hashed before saving, so it's reasonably safe. (If it doesn't appear
+to work for your continent, try "ww", their world-wide catchall.)
 
 With that set up, you could have it clean in auto mode for 10 minutes
 and return to its charger:
@@ -83,7 +83,7 @@ so it also has a mode where it randomly decides to run or not based on
 a frequency you give it. My crontab entry looks like this:
 
 ```
-0 10 * * * /home/william/projects/sucks/sucks clean -f 4/7 15 edge -f 1/14 10
+0 10 * * * /home/william/projects/sucks/sucks.sh clean -f 4/7 15 edge -f 1/14 10
 ```
 
 This means that every day at 10 am, it might do something. 4 days out
@@ -118,9 +118,9 @@ vacbot.run(Charge()) # return to the charger
 ## Developing
 
 If you'd like to join in on developing, I recommend checking out the code,
-doing `pipenv install` to set up a virtual environment, and then `pipenv shell`
-to start using it. You can run the existing tests using `nosetests`. Current
-test are not yet comprehensive, as the integrated nature of this makes it difficult.
+setting up a virtual environment, and doing `pip install -e .`. You can
+run the existing tests using `nosetests`. Current test are not yet
+comprehensive, as the integrated nature of this makes it difficult.
 But I aim to reduce that problem over time, so please add tests as you go.
 
 
@@ -142,12 +142,4 @@ very helpful in figuring out what the Android app was up to,
 experiments](https://community.smartthings.com/t/ecovacs-deebot-n79/93410/33)
 with his device, and
 * All the users who have given useful feedback and reported on how it is
-working for them.
-
-
-
-
-
-## To Do
-
-* add a status commmand
+working for them, and even contributed code.

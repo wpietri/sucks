@@ -1,24 +1,17 @@
-from setuptools import setup, find_packages
 from codecs import open
 from os import path
 
-from pipenv.project import Project
-from pipenv.utils import convert_deps_to_pip
-
-pfile = Project(chdir=False).parsed_pipfile
-requirements = convert_deps_to_pip(pfile['packages'], r=False)
-test_requirements = convert_deps_to_pip(pfile['dev-packages'], r=False)
-
+from setuptools import setup, find_packages
 
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
     name='sucks',
-    version='0.8.1',
+    version='0.8.2',
 
     description='a library for controlling certain robot vacuums',
     long_description=long_description,
@@ -60,20 +53,28 @@ setup(
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
 
-
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
 
-    install_requires=convert_deps_to_pip(pfile['packages'], r=False),
+    install_requires=[
+        'sleekxmpp>=1.3',
+        'click>=6',
+        'requests>=2.18',
+        'pycryptodome>=3.4',
+        'pycountry-convert>=0.5'
+    ],
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
     # for example:
     # $ pip install -e .[dev,test]
     extras_require={
-        'dev': convert_deps_to_pip(pfile['dev-packages'], r=False),
+        'dev': [
+            'nose',
+            'requests-mock>=1.3'
+        ],
     },
 
     # If there are data files included in your packages that need to be
