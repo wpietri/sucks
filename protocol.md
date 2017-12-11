@@ -22,6 +22,15 @@ For example, a Canadian user must authenticate on  country-specific HTTPS
 server, but XMPP commands work both on the worldwide server 
 msg-ww.ecouser.net) and the North America server (msg-na.ecouser.net)
 
+The Android App uses the following XMPP messaging servers:
+
+```
+CH: msg.ecouser.net
+TW, MY, JP, SG, TH, HK, IN, KR: msg-as.ecouser.net
+US: msg-na.ecouser.net
+FR, ES, UK, NO, MX, DE, PT, CH, AU, IT, NL, SE, BE, DK: msg-eu.ecouser.net
+Any other country: msg-ww.ecouser.net
+```
 
 
 ## HTTPS
@@ -58,8 +67,7 @@ from step 4, gets the list of devices; that's needed for talking to the
 vacuum via XMPP
 
 
-## XMPP
-
+## XMPP 
 
 The app establishes a connection to an XMPP server and logs in using
 a secret that comes from the earlier HTTPS calls. It then sends XMPP IQ
@@ -78,7 +86,8 @@ elements that appear to be commands.
 - **Response** `<ctl td="CleanReport"><clean type="stop" speed="standard" /></ctl>`
   - type `auto` automatic cleaning program
   - type `border` edge cleaning program
-  - type `singleroom` cleaning a single room
+  - type `spot` spot cleaning program
+  - type `singleroom` cleaning a single room 
   - type `stop` bot at full stop
   - speed `standard` regular fan speed (suction)
   - speed `strong` high fan speed (suction)
@@ -90,6 +99,7 @@ elements that appear to be commands.
 - `<query xmlns="com:ctl"><ctl td="Charge"><charge type="go"/></ctl>`
   - `go` order bot to return to charger
 
+**State**
 - *Request* `<query xmlns="com:ctl"><ctl td="GetChargeState" />`
 - *Response* `<ctl td="ChargeState"><charge type="SlotCharging" /></ctl>`
   - `Idle` not trying to charge
@@ -97,12 +107,13 @@ elements that appear to be commands.
   - `SlotCharging` currently charging in dock
   - `WireCharging` currently charging by cable
 
-*Note: It appears the bot can be in an active CleanState (i.e. auto) as well as in an active ChargeState (i.e. SlotCharging). The assumption is that in this case, the cleaning task will resume after the bot is sufficiently charged. More testing is needed.*
 
 
 ### Battery State
 
-Battery charge level. 080 = 80% charged.
+Battery charge level. 080 = 80% charged. State is broadcast
+continously when the robot is running och charging, but can also
+be requested manually.
 
 - *Request* `<ctl td="GetBatteryInfo" />`
 - *Response* `<ctl td="BatteryInfo"><battery power="080" /></ctl>` 
@@ -124,15 +135,26 @@ It's presumed that the timers need to be reset manually.
 
 ### Manually moving around
 
-To stop the current action, issue the stop action.
-
 **Command**
-- `<ctl td="Move"><move action="forward"/></ctl>`
-- `<ctl td="Move"><move action="SpinLeft"/></ctl>`
-- `<ctl td="Move"><move action="SpinRight"/></ctl>`
-- `<ctl td="Move"><move action="stop"/></ctl>`
-- `<ctl td="Move"><move action="TurnAround"/></ctl>`
+- Move forward: `<ctl td="Move"><move action="forward"/></ctl>`
+- Spin left 360 degrees: `<ctl td="Move"><move action="SpinLeft"/></ctl>`
+- Spin right 360 degrees: `<ctl td="Move"><move action="SpinRight"/></ctl>`
+- Turn 180 degrees: `<ctl td="Move"><move action="TurnAround"/></ctl>`
+- Stop the ongoing action: `<ctl td="Move"><move action="stop"/></ctl>`
 
+
+### Configuration
+
+**Set/get robot internal clock**
+- `<ctl td="SetTime"><time t="1509622697" tz="+8"/></ctl>`
+- `<ctl td="GetTime"></ctl>`
+  - Time is specified as a UNIX timestamp and timezone + or - UTC offset.
+
+**Get firmware version**
+`<ctl td="GetVersion" name="FW"/>` 
+
+**Get robot logs**
+`<ctl td="GetLog"></ctl>` 
 
 
 ### Errors
@@ -148,32 +170,30 @@ The latest error can be requested like so:
 
 However in some cases the robot sends to code 100 shortly
 after an error has occurred, meaning that we cannot trust
-the GetError request to contain the last error.
+the GetError request to contain the last relevant error.
 For example, if the robot gets stuck it broadcasts 102
-HostHang, thenproceeds to stop and broadcasts 100 NoError.
+HostHang, then proceeds to stop and broadcasts 100 NoError.
 
 
 **Known error codes**
-- 100 NoError (back to normal)
-- 101 BatteryLow
-- 102 HostHang (bot is stuck)
-- 103 WheelAbnormal
-- 104 DownSensorAbnormal
+- 100 NoError: Robot is operational
+- 101 BatteryLow: Low battery
+- 102 HostHang: Robot is stuck
+- 103 WheelAbnormal: Wheels are not moving as expected
+- 104 DownSensorAbnormal: Down sensor is getting abnormal values
+- 110 NoDustBox: Dust Bin Not installed
 
+These codes are taken from model M81 Pro. Error codes may differ
+between models.
 
 
 ### Untested commands
 
 ```
+<ctl td="SetOnOff" t="b" on="1"/>
 <ctl td="GetOnOff" />
-<ctl id="102461185" ret="ok" on="0"/>
-
 <ctl id="12351409" td="PlaySound" sid="0"/>
-
-<ctl id="13259797" td="SetTime"><time t="1509622697" tz="-7"/></ctl>
-
 <ctl id="30800321" td="GetSched"/>
-
 ```
 
 It appears that it adds an extra id when it cares to receive a specific response.
