@@ -1,8 +1,26 @@
+import tempfile
+from unittest.mock import Mock, patch
+
 import requests_mock
 from nose.tools import *
 
 from sucks.cli import *
 
+
+def test_config_file_name():
+    if platform.system() == 'Windows':
+        print(config_file())
+        assert_true(re.match(r'[A-Z]:\\.+\\\w+\\AppData(\\Roaming)?\\sucks.conf', config_file()))
+    else:
+        assert_true(re.match(r'/.+/\w+/.config/sucks.conf', config_file()))
+
+
+def test_write_and_read_config():
+    with patch('sucks.cli.config_file', Mock(return_value=os.path.join(tempfile.mkdtemp(), 'some_other_dir', 'sucks.conf'))):
+        write_config({'a': "ayyy", 'b': 2})
+        config2 = read_config()
+        assert_equals(config2['a'], 'ayyy')
+        assert_equals(config2['b'], '2')
 
 def test_frequency_param_type():
     t = FREQUENCY
