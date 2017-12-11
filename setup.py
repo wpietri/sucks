@@ -6,12 +6,16 @@ from setuptools import setup, find_packages
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
-    long_description = f.read()
+long_description = ''
+try:
+    with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
+        long_description = f.read()
+except FileNotFoundError:
+    print("can't find python README; skipping")
 
 setup(
     name='sucks',
-    version='0.8.2',
+    version='0.8.3',
 
     description='a library for controlling certain robot vacuums',
     long_description=long_description,

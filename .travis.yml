@@ -4,7 +4,6 @@ python:
   - "3.5"
   - "3.6"
 install:
-  - pip install pipenv
-  - pipenv install -d --system
+  - pip install -e .[dev]
 
 script: nosetests
