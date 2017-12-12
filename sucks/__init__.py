@@ -7,6 +7,7 @@ from threading import Event
 
 import click
 import requests
+import stringcase
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
 
@@ -135,34 +136,38 @@ class VacBot():
         self.battery_status = None
 
         self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent)
-        self.xmpp.register_callback("CleanReport", self._handle_clean_report)
-        self.xmpp.register_callback("ChargeState", self._handle_charge_report)
-        self.xmpp.register_callback("BatteryInfo", self._handle_battery_report)
         self.xmpp.register_callback("error", self._handle_error)
+        self.xmpp.subscribe_to_ctls(self._handle_ctl)
 
     def connect_and_wait_until_ready(self):
         self.xmpp.connect_and_wait_until_ready()
 
-        self.xmpp.schedule('Ping', 30, lambda: self.xmpp.send_ping(self._vacuum_adress()), repeat=True)
+        self.xmpp.schedule('Ping', 30, lambda: self.xmpp.send_ping(self._vacuum_address()), repeat=True)
 
-    def _handle_clean_report(self, iq):
-        self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
+    def _handle_ctl(self, ctl):
+        method = '_handle_' + ctl['event']
+        if hasattr(self, method):
+            getattr(self, method)(ctl)
+
+
+    def _handle_clean_report(self, event):
+        self.clean_status = event['type']
         logging.debug("*** clean_status = " + self.clean_status)
 
-    def _handle_battery_report(self, iq):
+    def _handle_battery_info(self, iq):
         try:
-            self.battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
+            self.battery_status = float(iq['power']) / 100
             logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
         except ValueError:
             logging.warning("couldn't parse battery status " + ET.tostring(iq))
 
-    def _handle_charge_report(self, iq):
-        report = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}charge').get('type')
-        if report.lower() == 'going':
+    def _handle_charge_state(self, event):
+        report = event['type']
+        if report == 'going':
             self.charge_status = 'returning'
-        elif report.lower() == 'slotcharging':
+        elif report == 'slot_charging':
             self.charge_status = 'charging'
-        elif report.lower() == 'idle':
+        elif report == 'idle':
             self.charge_status = 'idle'
         else:
             logging.warning("Unknown charging status '" + report + "'")
@@ -173,11 +178,11 @@ class VacBot():
         error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
         logging.debug("*** error = " + error_no + " " + error)
 
-    def _vacuum_adress(self):
+    def _vacuum_address(self):
         return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
 
     def send_command(self, xml):
-        self.xmpp.send_command(xml, self._vacuum_adress())
+        self.xmpp.send_command(xml, self._vacuum_address())
 
     def run(self, action):
         self.send_command(action.to_xml())
@@ -198,6 +203,7 @@ class EcoVacsXMPP(ClientXMPP):
         self.credentials['authzid'] = user
         self.add_event_handler("session_start", self.session_start)
 
+        self.ctl_subscribers = []
         self.ready_flag = Event()
 
     def wait_until_ready(self):
@@ -206,7 +212,31 @@ class EcoVacsXMPP(ClientXMPP):
     def session_start(self, event):
         logging.debug("----------------- starting session ----------------")
         logging.debug("event = {}".format(event))
+        self.register_handler(Callback("general",
+                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}'),
+                                       self._handle_ctl))
+
         self.ready_flag.set()
+
+    def subscribe_to_ctls(self, function):
+        self.ctl_subscribers.append(function)
+
+
+    def _handle_ctl(self, message):
+        the_good_part = message.get_payload()[0][0]
+        as_dict = self._ctl_to_dict(the_good_part)
+        for s in self.ctl_subscribers:
+            s(as_dict)
+
+    def _ctl_to_dict(self, xml):
+        result = xml.attrib.copy()
+        result['event'] = result.pop('td')
+        if xml:
+            result.update(xml[0].attrib)
+
+        for key in result:
+            result[key] = stringcase.snakecase(result[key])
+        return result
 
     def register_callback(self, kind, function):
         self.register_handler(Callback(kind,

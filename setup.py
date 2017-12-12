@@ -67,7 +67,8 @@ setup(
         'click>=6',
         'requests>=2.18',
         'pycryptodome>=3.4',
-        'pycountry-convert>=0.5'
+        'pycountry-convert>=0.5',
+        'stringcase>=1.2'
     ],
 
     # List additional groups of dependencies here (e.g. development
