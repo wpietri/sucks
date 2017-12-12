@@ -126,57 +126,37 @@ class EcoVacsAPI:
         return str(b64encode(result), 'utf8')
 
 
-class VacBot(ClientXMPP):
+class VacBot():
     def __init__(self, user, domain, resource, secret, vacuum, continent):
-        ClientXMPP.__init__(self, user + '@' + domain, '0/' + resource + '/' + secret)
 
-        self.user = user
-        self.domain = domain
-        self.resource = resource
         self.vacuum = vacuum
-        self.continent = continent
-        self.credentials['authzid'] = user
-        self.add_event_handler("session_start", self.session_start)
-
-        self.ready_flag = Event()
         self.clean_status = None
         self.charge_status = None
         self.battery_status = None
 
-    def wait_until_ready(self):
-        self.ready_flag.wait()
+        self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent)
+        self.xmpp.register_callback("CleanReport", self._handle_clean_report)
+        self.xmpp.register_callback("ChargeState", self._handle_charge_report)
+        self.xmpp.register_callback("BatteryInfo", self._handle_battery_report)
+        self.xmpp.register_callback("error", self._handle_error)
 
-    def session_start(self, event):
-        logging.debug("----------------- starting session ----------------")
-        logging.debug("event = {}".format(event))
-        self.ready_flag.set()
+    def connect_and_wait_until_ready(self):
+        self.xmpp.connect_and_wait_until_ready()
 
-        self.__register_callback("CleanReport", self.handle_clean_report)
-        self.__register_callback("ChargeState", self.handle_charge_report)
-        self.__register_callback("BatteryInfo", self.handle_battery_report)
-        self.__register_callback("error", self.handle_error)
+        self.xmpp.schedule('Ping', 30, lambda: self.xmpp.send_ping(self._vacuum_adress()), repeat=True)
 
-        self.schedule('Ping', 30, self.send_ping, repeat=True)
-
-
-    def __register_callback(self, kind, function):
-        self.register_handler(Callback(kind,
-                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="' + kind + '"]'),
-                                       function))
-
-
-    def handle_clean_report(self, iq):
+    def _handle_clean_report(self, iq):
         self.clean_status = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}clean').get('type')
         logging.debug("*** clean_status = " + self.clean_status)
 
-    def handle_battery_report(self, iq):
+    def _handle_battery_report(self, iq):
         try:
             self.battery_status = float(iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}battery').get('power')) / 100
             logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
         except ValueError:
             logging.warning("couldn't parse battery status " + ET.tostring(iq))
 
-    def handle_charge_report(self, iq):
+    def _handle_charge_report(self, iq):
         report = iq.find('{com:ctl}query/{com:ctl}ctl/{com:ctl}charge').get('type')
         if report.lower() == 'going':
             self.charge_status = 'returning'
@@ -188,44 +168,77 @@ class VacBot(ClientXMPP):
             logging.warning("Unknown charging status '" + report + "'")
         logging.debug("*** charge_status = " + self.charge_status)
 
-    def handle_error(self, iq):
+    def _handle_error(self, iq):
         error = iq.find('{com:ctl}query/{com:ctl}ctl').get('error')
         error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
         logging.debug("*** error = " + error_no + " " + error)
 
+    def _vacuum_adress(self):
+        return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
+
     def send_command(self, xml):
-        c = self.wrap_command(xml)
+        self.xmpp.send_command(xml, self._vacuum_adress())
+
+    def run(self, action):
+        self.send_command(action.to_xml())
+        action.wait_for_completion(self)
+
+    def disconnect(self, wait=False):
+        self.xmpp.disconnect(wait=wait)
+
+
+class EcoVacsXMPP(ClientXMPP):
+    def __init__(self, user, domain, resource, secret, continent):
+        ClientXMPP.__init__(self, user + '@' + domain, '0/' + resource + '/' + secret)
+
+        self.user = user
+        self.domain = domain
+        self.resource = resource
+        self.continent = continent
+        self.credentials['authzid'] = user
+        self.add_event_handler("session_start", self.session_start)
+
+        self.ready_flag = Event()
+
+    def wait_until_ready(self):
+        self.ready_flag.wait()
+
+    def session_start(self, event):
+        logging.debug("----------------- starting session ----------------")
+        logging.debug("event = {}".format(event))
+        self.ready_flag.set()
+
+    def register_callback(self, kind, function):
+        self.register_handler(Callback(kind,
+                                       MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="' + kind + '"]'),
+                                       function))
+
+    def send_command(self, xml, recipient):
+        c = self._wrap_command(xml, recipient)
         logging.debug('Sending command {0}'.format(c))
         c.send()
 
-    def wrap_command(self, ctl):
-        q = self.make_iq_query(xmlns=u'com:ctl', ito=self.__vacuum_adress(), ifrom=self.__my_address())
+    def _wrap_command(self, ctl, recipient):
+        q = self.make_iq_query(xmlns=u'com:ctl', ito=recipient, ifrom=self._my_address())
         q['type'] = 'set'
         for child in q.xml:
             if child.tag.endswith('query'):
                 child.append(ctl)
                 return q
 
-    def send_ping(self):
-        q = self.make_iq_get(ito=self.__vacuum_adress(), ifrom=self.__my_address())
+    def _my_address(self):
+        return self.user + '@' + self.domain + '/' + self.resource
+
+    def send_ping(self, to):
+        q = self.make_iq_get(ito=to, ifrom=self._my_address())
         q.xml.append(ET.Element('ping', {'xmlns': 'urn:xmpp:ping'}))
         logging.debug("*** sending ping ***")
         q.send()
-
-    def __my_address(self):
-        return self.user + '@' + self.domain + '/' + self.resource
-
-    def __vacuum_adress(self):
-        return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
 
     def connect_and_wait_until_ready(self):
         self.connect(('msg-{}.ecouser.net'.format(self.continent), '5223'))
         self.process()
         self.wait_until_ready()
-
-    def run(self, action):
-        self.send_command(action.to_xml())
-        action.wait_for_completion(self)
 
 
 class VacBotCommand:

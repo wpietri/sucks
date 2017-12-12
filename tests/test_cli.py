@@ -61,20 +61,6 @@ def test_continent_for_country():
     assert_equal(continent_for_country('fr'), 'eu')
 
 
-def test_wrap_command():
-    v = VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
-               {"did": "E0000000001234567890", "class": "126", "nick": "bob"}, 'na')
-    c = str(v.wrap_command(Clean(1).to_xml()))
-    assert_true(re.search(r'from="20170101abcdefabcdefa@ecouser.net/abcdef12"', c))
-    assert_true(re.search(r'to="E0000000001234567890@126.ecorobot.net/atom"', c))
-
-
-def test_model_variation():
-    v = VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
-               {"did": "E0000000001234567890", "class": "141", "nick": "bob"}, 'na')
-    c = str(v.wrap_command(Clean(1).to_xml()))
-    assert_true(re.search(r'to="E0000000001234567890@141.ecorobot.net/atom"', c))
-
 
 def test_main_api_setup():
     with requests_mock.mock() as m:
