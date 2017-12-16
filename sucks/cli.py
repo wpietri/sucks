@@ -125,7 +125,7 @@ def login(email, password, country_code, continent_code):
 @click.argument('minutes', type=click.FLOAT)
 def clean(frequency, minutes):
     if should_run(frequency):
-        return Clean(minutes * 60)
+        return Clean(wait=minutes * 60)
 
 
 @cli.command(help='cleans room edges for the specified number of minutes')
@@ -133,17 +133,17 @@ def clean(frequency, minutes):
 @click.argument('minutes', type=click.FLOAT)
 def edge(frequency, minutes):
     if should_run(frequency):
-        return Edge(minutes * 60)
+        return Edge(wait=minutes * 60)
 
 
 @cli.command(help='returns to charger')
 def charge():
-    return Charge()
+    return ChargeAndWaitForCompletion(terminal=True)
 
 
 @cli.command(help='stops the robot in its current position')
 def stop():
-    return Stop()
+    return StopAndWaitForCompletion(terminal=True)
 
 
 @cli.resultcallback()
