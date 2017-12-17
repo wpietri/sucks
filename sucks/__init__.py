@@ -367,7 +367,7 @@ class Charge(VacBotCommand):
         super().__init__('Charge', {'charge': {'type': self.CHARGE_MODE['return']}}, terminal=terminal)
 
 
-class ChargeAndWaitForCompletion(VacBotCommand):
+class ChargeAndWaitForCompletion(Charge):
     def __init__(self, terminal=False):
         super().__init__(terminal=terminal)
 
