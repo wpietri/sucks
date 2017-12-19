@@ -6,8 +6,8 @@ sucks
 =====
 
 A simple command-line python script to drive a robot vacuum. Currently
-known to work with the Ecovacs Deebot N79, M80 Pro, M81, and M88
-Pro from both North America and Europe.
+known to work with the Ecovacs Deebot N79, M80 Pro, M81, M88
+Pro, and R95 MKII from both North America and Europe.
 
 Does it work for your model as well? Join the discussion on the
 [sucks-users mailing
@@ -17,8 +17,7 @@ If you're curious about the protocol, I have [a rough doc](http://github.com/wpi
 started. I'll happily accept pull requests for it.
 
 Why the project name? Well, a) it's ridiculous that I needed to MITM
-my own vacuum.  This is not the future I signed up for. There should
-be a nice, tidy RESTful API. That would be easy enough to make. And b),
+my own vacuum.  This is not the future I signed up for. And b),
 it's a vacuum.
 
 ## Installation
@@ -101,7 +100,7 @@ shaping the API.
 A simple usage might go something like this:
 
 ```
-include sucks
+import sucks
 
 config = ...
 
@@ -111,7 +110,8 @@ my_vac = api.devices()[0]
 vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, my_vac, config['continent'])
 vacbot.connect_and_wait_until_ready()
 
-vacbot.run(Clean(900)) # clean for 15 minutes
+vacbot.run(Clean())  # start cleaning
+time.sleep(900)      # clean for 15 minutes
 vacbot.run(Charge()) # return to the charger
 ```
 
@@ -119,9 +119,8 @@ vacbot.run(Charge()) # return to the charger
 
 If you'd like to join in on developing, I recommend checking out the code,
 setting up a virtual environment, and doing `pip install -e .`. You can
-run the existing tests using `nosetests`. Current test are not yet
-comprehensive, as the integrated nature of this makes it difficult.
-But I aim to reduce that problem over time, so please add tests as you go.
+run the existing tests using `nosetests`. Please add tests for any
+new functionality.
 
 For more information see [the development documentation](developing.md)
 
@@ -143,5 +142,4 @@ very helpful in figuring out what the Android app was up to,
 * Albert Louw, who was kind enough to post code from [his own
 experiments](https://community.smartthings.com/t/ecovacs-deebot-n79/93410/33)
 with his device, and
-* All the users who have given useful feedback and reported on how it is
-working for them, and even contributed code.
+* All the users who have given useful feedback and contributed code!
