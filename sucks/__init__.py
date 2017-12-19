@@ -272,7 +272,38 @@ class EcoVacsXMPP(ClientXMPP):
 
 
 class VacBotCommand:
-    def __init__(self, name, args=None, wait=None, terminal=False):
+
+    CLEAN_MODE ={
+        'auto': 'auto',
+        'edge': 'border',
+        'spot': 'spot',
+        'single_room': 'singleroom',
+        'stop': 'stop'
+    }
+    FAN_SPEED = {
+        'normal': 'standard',
+        'high': 'strong'
+    }
+    CHARGE_MODE = {
+        'return': 'go',
+        'returning': 'Going',
+        'charging': 'SlotCharging',
+        'idle': 'Idle'
+    }
+    COMPONENT = {
+        'main_brush': 'Brush',
+        'side_brush': 'SideBrush',
+        'filter': 'DustCaseHeap'
+    }
+    ACTION = {
+        'forward': 'forward',
+        'left': 'SpinLeft',
+        'right': 'SpinRight',
+        'turn_around': 'TurnAround',
+        'stop': 'stop'
+    }
+
+    def __init__(self, name, args={}, wait=None, terminal=False):
         self.name = name
         self.args = args
         self.wait = wait
@@ -285,9 +316,12 @@ class VacBotCommand:
 
     def to_xml(self):
         ctl = ET.Element('ctl', {'td': self.name})
-        if self.args:
-            inner = ET.Element(self.name.lower(), self.args)
-            ctl.append(inner)
+        for key, value in self.args.items():
+            if type(value) is dict:
+                inner = ET.Element(key, value)
+                ctl.append(inner)
+            else:
+                ctl.set(key, value)
         return ctl
 
     def __str__(self, *args, **kwargs):
@@ -298,18 +332,44 @@ class VacBotCommand:
 
 
 class Clean(VacBotCommand):
-    def __init__(self, wait):
-        super().__init__('Clean', {'type': 'auto', 'speed': 'standard'}, wait)
+    def __init__(self, mode='auto', speed='normal', wait=None, terminal=False):
+        super().__init__('Clean', {'clean': {'type': self.CLEAN_MODE[mode], 'speed': self.FAN_SPEED[speed]}}, wait=wait, terminal=terminal )
 
 
-class Edge(VacBotCommand):
-    def __init__(self, wait):
-        super().__init__('Clean', {'type': 'border', 'speed': 'strong'}, wait)
+class Edge(Clean):
+    def __init__(self, wait=None, terminal=False):
+        super().__init__('edge', 'high', wait=wait, terminal=terminal)
+
+
+class Spot(Clean):
+    def __init__(self, wait=None, terminal=False):
+        super().__init__('spot', 'high', wait=wait, terminal=terminal)
+
+
+class Stop(Clean):
+    def __init__(self, wait=None, terminal=False):
+        super().__init__('stop', 'normal', wait=wait, terminal=terminal)
+
+
+class StopAndWaitForCompletion(Stop):
+    def __init__(self, terminal=False):
+        super().__init__(terminal=False)
+
+    def wait_for_completion(self, bot):
+        logging.debug("waiting in " + self.name)
+        while bot.clean_status not in ['stop']:
+            time.sleep(0.5)
+        logging.debug("done waiting in " + self.name)
 
 
 class Charge(VacBotCommand):
-    def __init__(self):
-        super().__init__('Charge', {'type': 'go'}, terminal=True)
+    def __init__(self, terminal=False):
+        super().__init__('Charge', {'charge': {'type': self.CHARGE_MODE['return']}}, terminal=terminal)
+
+
+class ChargeAndWaitForCompletion(Charge):
+    def __init__(self, terminal=False):
+        super().__init__(terminal=terminal)
 
     def wait_for_completion(self, bot):
         logging.debug("waiting in " + self.name)
@@ -319,12 +379,31 @@ class Charge(VacBotCommand):
         click.echo("docked")
 
 
-class Stop(VacBotCommand):
-    def __init__(self):
-        super().__init__('Clean', {'type': 'stop', 'speed': 'standard'}, terminal=True)
+class Move(VacBotCommand):
+    def __init__(self, action):
+        super().__init__('Move', {'move': {'action': self.ACTION[action]}})
 
-    def wait_for_completion(self, bot):
-        logging.debug("waiting in " + self.name)
-        while bot.clean_status not in ['stop']:
-            time.sleep(0.5)
-        logging.debug("done waiting in " + self.name)
+
+class GetCleanState(VacBotCommand):
+    def __init__(self):
+        super().__init__('GetCleanState')
+
+
+class GetChargeState(VacBotCommand):
+    def __init__(self):
+        super().__init__('GetChargeState')
+
+
+class GetBatteryState(VacBotCommand):
+    def __init__(self):
+        super().__init__('GetBatteryInfo')
+
+
+class GetLifeSpan(VacBotCommand):
+    def __init__(self, component):
+        super().__init__('GetLifeSpan', {'type':self.COMPONENT[component]})
+
+
+class SetTime(VacBotCommand):
+    def __init__(self, timestamp, timezone):
+        super().__init__('SetTime', {'time':{'t':timestamp, 'tz':timezone}})
