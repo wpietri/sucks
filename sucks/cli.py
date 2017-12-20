@@ -5,6 +5,7 @@ import platform
 import random
 import re
 
+import click
 from pycountry_convert import country_alpha2_to_continent_code
 
 from sucks import *
@@ -37,6 +38,46 @@ class FrequencyParamType(click.ParamType):
 
 
 FREQUENCY = FrequencyParamType()
+
+
+class BotWait():
+    pass
+
+    def wait(self, bot):
+        raise NotImplementedError()
+
+
+class TimeWait(BotWait):
+    def __init__(self, seconds):
+        super().__init__()
+        self.seconds = seconds
+
+    def wait(self, bot):
+        click.echo("waiting for " + str(self.seconds) + "s")
+        time.sleep(self.seconds)
+
+
+class StatusWait(BotWait):
+    def __init__(self, wait_on, wait_for):
+        super().__init__()
+        self.wait_on = wait_on
+        self.wait_for = wait_for
+
+    def wait(self, bot):
+        if not hasattr(bot, self.wait_on):
+            raise ValueError("object " + bot + " does not have method " + self.wait_on)
+        logging.debug("waiting on " + self.wait_on + " for value " + self.wait_for)
+
+        while getattr(bot, self.wait_on) != self.wait_for:
+            time.sleep(0.5)
+        logging.debug("wait complete; " + self.wait_on + " is now " + self.wait_for)
+
+
+class CliAction:
+    def __init__(self, vac_command, terminal=False, wait=None):
+        self.vac_command = vac_command
+        self.terminal = terminal
+        self.wait = wait
 
 
 def config_file():
@@ -125,7 +166,7 @@ def login(email, password, country_code, continent_code):
 @click.argument('minutes', type=click.FLOAT)
 def clean(frequency, minutes):
     if should_run(frequency):
-        return Clean(wait=minutes * 60)
+        return CliAction(Clean(), wait=TimeWait(minutes * 60))
 
 
 @cli.command(help='cleans room edges for the specified number of minutes')
@@ -133,24 +174,28 @@ def clean(frequency, minutes):
 @click.argument('minutes', type=click.FLOAT)
 def edge(frequency, minutes):
     if should_run(frequency):
-        return Edge(wait=minutes * 60)
+        return CliAction(Edge(), wait=TimeWait(minutes * 60))
 
 
 @cli.command(help='returns to charger')
 def charge():
-    return ChargeAndWaitForCompletion(terminal=True)
+    return charge_action()
+
+
+def charge_action():
+    return CliAction(Charge(), terminal=True, wait=StatusWait('charge_status', 'charging'))
 
 
 @cli.command(help='stops the robot in its current position')
 def stop():
-    return StopAndWaitForCompletion(terminal=True)
+    return CliAction(Stop(), terminal=True, wait=StatusWait('clean_status', 'stop'))
 
 
 @cli.resultcallback()
 def run(actions, debug):
     actions = list(filter(None.__ne__, actions))
     if actions and charge and not actions[-1].terminal:
-        actions.append(Charge())
+        actions.append(charge_action())
 
     if not config_file_exists():
         click.echo("Not logged in. Do 'click login' first.")
@@ -168,8 +213,9 @@ def run(actions, debug):
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:
-            click.echo("performing " + str(action))
-            vacbot.run(action)
+            click.echo("performing " + str(action.vac_command))
+            vacbot.run(action.vac_command)
+            action.wait.wait(vacbot)
 
         vacbot.disconnect(wait=True)
 

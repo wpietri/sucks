@@ -10,7 +10,7 @@ from sucks import *
 
 def test_wrap_command():
     x = make_ecovacs_xmpp()
-    c = str(x._wrap_command(Clean(wait=1).to_xml(), 'E0000000001234567890@126.ecorobot.net/atom'))
+    c = str(x._wrap_command(Clean().to_xml(), 'E0000000001234567890@126.ecorobot.net/atom'))
     assert_true(search(r'from="20170101abcdefabcdefa@ecouser.net/abcdef12"', c))
     assert_true(search(r'to="E0000000001234567890@126.ecorobot.net/atom"', c))
 
