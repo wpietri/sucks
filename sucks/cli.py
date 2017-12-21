@@ -4,6 +4,8 @@ import os
 import platform
 import random
 import re
+import ast
+import time
 
 import click
 from pycountry_convert import country_alpha2_to_continent_code
@@ -89,6 +91,10 @@ def config_file():
 
 def config_file_exists():
     return os.path.isfile(config_file())
+   
+
+def delete_config():
+    return os.remove(config_file())
 
 
 def read_config():
@@ -133,13 +139,37 @@ def cli(debug):
     logging.basicConfig(level=level, format='%(levelname)-8s %(message)s')
 
 
+@cli.command(help='logs out the current user')
+def logout():
+
+    if not config_file_exists():
+        click.echo("Not logged in.")
+        exit(1)
+        
+    config = read_config()  
+    
+    if not click.confirm('are you sure you want to log out {}?'.format(config['email'])):
+        click.echo("Canceled logout.")
+        exit(1)
+        
+    EcoVacsAPI.logout_user(config['continent'],{
+     'realm': config['api_realm'],
+     'resource': config['api_resource'],
+     'userId': config['api_uid'],
+     'token': config['api_token']})
+    
+    delete_config()
+    logging.debug("successfully deleted login config and logged out")
+    exit(0)
+
 @cli.command(help='logs in with specified email; run this first')
 @click.option('--email', prompt='Ecovacs app email')
 @click.option('--password', prompt='Ecovacs app password', hide_input=True)
 @click.option('--country-code', prompt='your two-letter country code', default=lambda: current_country())
 @click.option('--continent-code', prompt='your two-letter continent code',
               default=lambda: continent_for_country(click.get_current_context().params['country_code']))
-def login(email, password, country_code, continent_code):
+@click.option('-e','--expiry', default=False, type=int)
+def login(email, password, country_code, continent_code, expiry):
     if config_file_exists() and not click.confirm('overwrite existing config?'):
         click.echo("Skipping login.")
         exit(0)
@@ -147,7 +177,7 @@ def login(email, password, country_code, continent_code):
     password_hash = EcoVacsAPI.md5(password)
     device_id = EcoVacsAPI.md5(str(time.time()))
     try:
-        EcoVacsAPI(device_id, email, password_hash, country_code, continent_code)
+        api = EcoVacsAPI(device_id, email, password_hash, country_code, continent_code)
     except ValueError as e:
         click.echo(e.args[0])
         exit(1)
@@ -156,6 +186,21 @@ def login(email, password, country_code, continent_code):
     config['device_id'] = device_id
     config['country'] = country_code.lower()
     config['continent'] = continent_code.lower()
+    
+    if expiry > 0:
+        click.echo("You've set the login token expiry to {} hours.".format(str(expiry)))
+    else:
+        expiry = 168
+        click.echo("Default token expiry set to every {} hours.".format(str(expiry)))
+        
+    expiry = expiry*3600
+    config['api_expiry_length'] = str(expiry)
+    config['api_when_expiry'] = str(time.time()+expiry)
+    config['api_uid'] = api.uid
+    config['api_realm'] = api.REALM
+    config['api_resource'] = api.resource
+    config['api_token'] = api.user_access_token
+    config['api_vacuum'] = str(api.devices()[0])
     write_config(config)
     click.echo("Config saved.")
     exit(0)
@@ -206,10 +251,36 @@ def run(actions, debug):
 
     if actions:
         config = read_config()
-        api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
-                         config['country'], config['continent'])
-        vacuum = api.devices()[0]
-        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
+        
+        if time.time() > float(config['api_when_expiry']):
+        
+            logging.warning("Token past expiry date, refreshing with user login data...")
+            
+            EcoVacsAPI.logout_user(config['continent'],{
+             'realm': config['api_realm'],
+             'resource': config['api_resource'],
+             'userId': config['api_uid'],
+             'token': config['api_token']})
+             
+            try:
+                api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'], config['country'], config['continent'])
+            except ValueError as e:
+                click.echo(e.args[0])
+                exit(1) 
+                
+            
+            config['api_when_expiry'] = str(time.time()+int(config['api_expiry_length']))
+            config['api_uid'] = api.uid
+            config['api_realm'] = api.REALM
+            config['api_resource'] = api.resource
+            config['api_token'] = api.user_access_token
+            config['api_vacuum'] = str(api.devices()[0])
+            write_config(config)
+            
+            logging.debug("Token refresh complete")
+            
+        vacuum = ast.literal_eval(config['api_vacuum'])            
+        vacbot = VacBot(config['api_uid'], config['api_realm'], config['api_resource'], config['api_token'], vacuum, config['continent']) 
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:
