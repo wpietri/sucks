@@ -127,14 +127,14 @@ class EcoVacsAPI:
 
 
 class VacBot():
-    def __init__(self, user, domain, resource, secret, vacuum, continent):
+    def __init__(self, user, domain, resource, secret, vacuum, continent, server_address=None):
 
         self.vacuum = vacuum
         self.clean_status = None
         self.charge_status = None
         self.battery_status = None
 
-        self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent)
+        self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, server_address)
         self.xmpp.register_callback("error", self._handle_error)
         self.xmpp.subscribe_to_ctls(self._handle_ctl)
 
@@ -190,7 +190,7 @@ class VacBot():
 
 
 class EcoVacsXMPP(ClientXMPP):
-    def __init__(self, user, domain, resource, secret, continent):
+    def __init__(self, user, domain, resource, secret, continent, server_address=None):
         ClientXMPP.__init__(self, user + '@' + domain, '0/' + resource + '/' + secret)
 
         self.user = user
@@ -198,8 +198,11 @@ class EcoVacsXMPP(ClientXMPP):
         self.resource = resource
         self.continent = continent
         self.credentials['authzid'] = user
+        if server_address is None:
+            self.server_address = ('msg-{}.ecouser.net'.format(self.continent), '5223')
+        else:
+            self.server_address = server_address
         self.add_event_handler("session_start", self.session_start)
-
         self.ctl_subscribers = []
         self.ready_flag = Event()
 
@@ -212,7 +215,6 @@ class EcoVacsXMPP(ClientXMPP):
         self.register_handler(Callback("general",
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}'),
                                        self._handle_ctl))
-
         self.ready_flag.set()
 
     def subscribe_to_ctls(self, function):
@@ -262,7 +264,7 @@ class EcoVacsXMPP(ClientXMPP):
         q.send()
 
     def connect_and_wait_until_ready(self):
-        self.connect(('msg-{}.ecouser.net'.format(self.continent), '5223'))
+        self.connect(self.server_address)
         self.process()
         self.wait_until_ready()
 
