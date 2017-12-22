@@ -135,7 +135,6 @@ class VacBot():
         self.battery_status = None
 
         self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent)
-        self.xmpp.register_callback("error", self._handle_error)
         self.xmpp.subscribe_to_ctls(self._handle_ctl)
 
     def connect_and_wait_until_ready(self):
@@ -170,11 +169,6 @@ class VacBot():
         else:
             logging.warning("Unknown charging status '" + report + "'")
         logging.debug("*** charge_status = " + self.charge_status)
-
-    def _handle_error(self, iq):
-        error = iq.find('{com:ctl}query/{com:ctl}ctl').get('error')
-        error_no = iq.find('{com:ctl}query/{com:ctl}ctl').get('errno')
-        logging.debug("*** error = " + error_no + " " + error)
 
     def _vacuum_address(self):
         return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
