@@ -15,7 +15,7 @@ except FileNotFoundError:
 
 setup(
     name='sucks',
-    version='0.8.3',
+    version='0.8.4',
 
     description='a library for controlling certain robot vacuums',
     long_description=long_description,
