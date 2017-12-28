@@ -31,7 +31,7 @@ this.
 To get started, you'll need to have already set up an EcoVacs account
 using your smartphone.
 
-Step one is to log in:
+With that ready, step one is to log in:
 ```
     % sucks login
     Ecovacs app email: [your email]
@@ -41,8 +41,8 @@ Step one is to log in:
     Config saved.
 ```
 
-That creates a config file in ~/.config.sucks.conf. The password is
-hashed before saving, so it's reasonably safe. (If it doesn't appear
+That creates a config file in a platform-appropriate place. The password
+is hashed before saving, so it's reasonably safe. (If it doesn't appear
 to work for your continent, try "ww", their world-wide catchall.)
 
 With that set up, you could have it clean in auto mode for 10 minutes
