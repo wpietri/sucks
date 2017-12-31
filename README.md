@@ -22,7 +22,7 @@ it's a vacuum.
 
 ## Installation
 
-If you have a recent version of python, you should be able to
+If you have a recent version of Python 3, you should be able to
 do `pip install sucks` to get the most recently released version of
 this.
 
