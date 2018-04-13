@@ -41,7 +41,9 @@ class EcoVacsAPI:
         self.auth_code = self.__call_main_api('user/getAuthCode',
                                               ('uid', self.uid),
                                               ('accessToken', self.login_access_token))['authCode']
-        self.user_access_token = self.__call_login_by_it_token()['token']
+        login_response = self.__call_login_by_it_token()
+        self.user_access_token = login_response['token']
+        self.uid = login_response['userId']
         logging.debug("EcoVacsAPI connection complete")
 
     def __sign(self, params):
