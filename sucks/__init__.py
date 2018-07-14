@@ -9,7 +9,61 @@ import requests
 import stringcase
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
+from sleekxmpp.exceptions import XMPPError
 
+# These consts convert to and from Sucks's consts (which closely match what the UI and manuals use)
+# to and from what the Ecovacs API uses (which are sometimes very oddly named and have random capitalization.)
+CLEAN_MODE_TO_ECOVACS = {
+    'auto': 'auto',
+    'edge': 'border',
+    'spot': 'spot',
+    'single_room': 'singleroom',
+    'stop': 'stop'
+}
+
+CLEAN_MODE_FROM_ECOVACS = {
+    'auto': 'auto',
+    'border': 'edge',
+    'spot': 'spot',
+    'singleroom': 'single_room',
+    'stop': 'stop',
+    'going': 'returning'
+}
+
+FAN_SPEED_TO_ECOVACS = {
+    'normal': 'standard',
+    'high': 'strong'
+}
+
+FAN_SPEED_FROM_ECOVACS = {
+    'standard': 'normal',
+    'strong': 'high'
+}
+
+CHARGE_MODE_TO_ECOVACS = {
+    'return': 'go',
+    'returning': 'Going',
+    'charging': 'SlotCharging',
+    'idle': 'Idle'
+}
+
+CHARGE_MODE_FROM_ECOVACS = {
+    'going': 'returning',
+    'slot_charging': 'charging',
+    'idle': 'idle'
+}
+
+COMPONENT_TO_ECOVACS = {
+    'main_brush': 'Brush',
+    'side_brush': 'SideBrush',
+    'filter': 'DustCaseHeap'
+}
+
+COMPONENT_FROM_ECOVACS = {
+    'brush': 'main_brush',
+    'side_brush': 'side_brush',
+    'dust_case_heap': 'filter'
+}
 
 class EcoVacsAPI:
     CLIENT_KEY = "eJUWrzRv34qFSaYk"
@@ -126,53 +180,188 @@ class EcoVacsAPI:
         return str(b64encode(result), 'utf8')
 
 
+class EventEmitter(object):
+    """A very simple event emitting system."""
+    def __init__(self):
+        self._subscribers = []
+
+    def subscribe(self, callback):
+        listener = EventListener(self, callback)
+        self._subscribers.append(listener)
+        return listener
+
+    def unsubscribe(self, listener):
+        self._subscribers.remove(listener)
+
+    def notify(self, event):
+        for subscriber in self._subscribers:
+            subscriber.callback(event)
+
+
+class EventListener(object):
+    """Object that allows event consumers to easily unsubscribe from events."""
+    def __init__(self, emitter, callback):
+        self._emitter = emitter
+        self.callback = callback
+
+    def unsubscribe(self):
+        self._emitter.unsubscribe(self)
+
+
 class VacBot():
-    def __init__(self, user, domain, resource, secret, vacuum, continent, server_address=None):
+    def __init__(self, user, domain, resource, secret, vacuum, continent, server_address=None, monitor=False):
 
         self.vacuum = vacuum
+
+        # If True, the VacBot object will handle keeping track of all statuses,
+        # including the initial request for statuses, and new requests after the
+        # VacBot returns from being offline. It will also cause it to regularly
+        # request component lifespans
+        self._monitor = monitor
+
+        self._failed_pings = 0
+
+        # These three are representations of the vacuum state as reported by the API
         self.clean_status = None
         self.charge_status = None
         self.battery_status = None
 
-        self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, server_address)
+        # This is an aggregate state managed by the sucks library, combining the clean and charge events to a single state
+        self.vacuum_status = None
+        self.fan_speed = None
 
+        # Populated by component Lifespan reports
+        self.components = {}
+
+        self.statusEvents = EventEmitter()
+        self.batteryEvents = EventEmitter()
+        self.lifespanEvents = EventEmitter()
+        self.errorEvents = EventEmitter()
+
+        self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, server_address)
         self.xmpp.subscribe_to_ctls(self._handle_ctl)
 
     def connect_and_wait_until_ready(self):
         self.xmpp.connect_and_wait_until_ready()
 
-        self.xmpp.schedule('Ping', 30, lambda: self.xmpp.send_ping(self._vacuum_address()), repeat=True)
+        self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
+
+        if self._monitor:
+            # Do a first ping, which will also fetch initial statuses if the ping succeeds
+            self.send_ping()
+            self.xmpp.schedule('Components', 3600, lambda: self.refresh_components(), repeat=True)
 
     def _handle_ctl(self, ctl):
         method = '_handle_' + ctl['event']
         if hasattr(self, method):
             getattr(self, method)(ctl)
 
+    def _handle_error(self, event):
+        error = event['error']
+        self.errorEvents.notify(error)
+        logging.debug("*** error = " + error)
+
+    def _handle_life_span(self, event):
+        type = event['type']
+        try:
+            type = COMPONENT_FROM_ECOVACS[type]
+        except KeyError:
+            logging.warning("Unknown component type: '" + type + "'")
+
+        total = float(event['total'])
+        val = float(event['val'])
+        lifespan = val / total
+        self.components[type] = lifespan
+
+        lifespan_event = {'type': type, 'lifespan': lifespan}
+        self.lifespanEvents.notify(lifespan_event)
+        logging.debug("*** life_span " + type + " = " + str(lifespan))
+
     def _handle_clean_report(self, event):
-        self.clean_status = event['type']
-        logging.debug("*** clean_status = " + self.clean_status)
+        type = event['type']
+        try:
+            type = CLEAN_MODE_FROM_ECOVACS[type]
+        except KeyError:
+            logging.warning("Unknown cleaning status '" + type + "'")
+        self.clean_status = type
+        self.vacuum_status = type
+        fan = event.get('speed', None)
+        if fan is not None:
+            try:
+                fan = FAN_SPEED_FROM_ECOVACS[fan]
+            except KeyError:
+                logging.warning("Unknown fan speed: '" + fan + "'")
+        self.fan_speed = fan
+        self.statusEvents.notify(self.vacuum_status)
+        logging.debug("*** clean_status = " + self.clean_status + " fan_speed = " + self.fan_speed)
 
     def _handle_battery_info(self, iq):
         try:
             self.battery_status = float(iq['power']) / 100
-            logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
         except ValueError:
             logging.warning("couldn't parse battery status " + ET.tostring(iq))
+        else:
+            self.batteryEvents.notify(self.battery_status)
+            logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
 
     def _handle_charge_state(self, event):
-        report = event['type']
-        if report == 'going':
-            self.charge_status = 'returning'
-        elif report == 'slot_charging':
-            self.charge_status = 'charging'
-        elif report == 'idle':
-            self.charge_status = 'idle'
+        status = event['type']
+        try:
+            status = CHARGE_MODE_FROM_ECOVACS[status]
+        except KeyError:
+            logging.warning("Unknown charging status '" + status + "'")
         else:
-            logging.warning("Unknown charging status '" + report + "'")
-        logging.debug("*** charge_status = " + self.charge_status)
+            self.charge_status = status
+            if status != 'idle' or self.vacuum_status == 'charging':
+                # We have to ignore the idle messages, because all it means is that it's not
+                # currently charging, in which case the clean_status is a better indicator
+                # of what the vacuum is currently up to.
+                self.vacuum_status = status
+                self.statusEvents.notify(self.vacuum_status)
+            logging.debug("*** charge_status = " + self.charge_status)
 
     def _vacuum_address(self):
         return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
+
+    def send_ping(self):
+        try:
+            self.xmpp.send_ping(self._vacuum_address())
+        except XMPPError as err:
+            logging.warning("Ping did not reach VacBot. Will retry.")
+            logging.debug("*** Error type: " + err.etype)
+            logging.debug("*** Error condition: " + err.condition)
+            self._failed_pings += 1
+            if self._failed_pings >= 4:
+                self.vacuum_status = 'offline'
+                self.statusEvents.notify(self.vacuum_status)
+        else:
+            self._failed_pings = 0
+            if self._monitor:
+                # If we don't yet have a vacuum status, request initial statuses again, now that the ping succeeded
+                if self.vacuum_status == 'offline' or self.vacuum_status is None:
+                    self.request_all_statuses()
+
+    def refresh_components(self):
+        try:
+            self.run(GetLifeSpan('main_brush'))
+            self.run(GetLifeSpan('side_brush'))
+            self.run(GetLifeSpan('filter'))
+        except XMPPError as err:
+            logging.warning("Component refresh requests failed to reach VacBot. Will try again later.")
+            logging.debug("*** Error type: " + err.etype)
+            logging.debug("*** Error condition: " + err.condition)
+
+    def request_all_statuses(self):
+        try:
+            self.run(GetCleanState())
+            self.run(GetChargeState())
+            self.run(GetBatteryState())
+        except XMPPError as err:
+            logging.warning("Initial status requests failed to reach VacBot. Will try again on next ping.")
+            logging.debug("*** Error type: " + err.etype)
+            logging.debug("*** Error condition: " + err.condition)
+        else:
+            self.refresh_components()
 
     def send_command(self, xml):
         self.xmpp.send_command(xml, self._vacuum_address())
@@ -218,11 +407,16 @@ class EcoVacsXMPP(ClientXMPP):
     def _handle_ctl(self, message):
         the_good_part = message.get_payload()[0][0]
         as_dict = self._ctl_to_dict(the_good_part)
-        for s in self.ctl_subscribers:
-            s(as_dict)
+        if as_dict is not None:
+            for s in self.ctl_subscribers:
+                s(as_dict)
 
     def _ctl_to_dict(self, xml):
         result = xml.attrib.copy()
+        if 'td' not in result:
+            # This happens for commands with no response data, such as PlaySound
+            return
+
         result['event'] = result.pop('td')
         if xml:
             result.update(xml[0].attrib)
@@ -265,28 +459,6 @@ class EcoVacsXMPP(ClientXMPP):
 
 
 class VacBotCommand:
-    CLEAN_MODE = {
-        'auto': 'auto',
-        'edge': 'border',
-        'spot': 'spot',
-        'single_room': 'singleroom',
-        'stop': 'stop'
-    }
-    FAN_SPEED = {
-        'normal': 'standard',
-        'high': 'strong'
-    }
-    CHARGE_MODE = {
-        'return': 'go',
-        'returning': 'Going',
-        'charging': 'SlotCharging',
-        'idle': 'Idle'
-    }
-    COMPONENT = {
-        'main_brush': 'Brush',
-        'side_brush': 'SideBrush',
-        'filter': 'DustCaseHeap'
-    }
     ACTION = {
         'forward': 'forward',
         'left': 'SpinLeft',
@@ -320,7 +492,7 @@ class VacBotCommand:
 
 class Clean(VacBotCommand):
     def __init__(self, mode='auto', speed='normal', terminal=False):
-        super().__init__('Clean', {'clean': {'type': self.CLEAN_MODE[mode], 'speed': self.FAN_SPEED[speed]}})
+        super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
 
 
 class Edge(Clean):
@@ -340,12 +512,17 @@ class Stop(Clean):
 
 class Charge(VacBotCommand):
     def __init__(self):
-        super().__init__('Charge', {'charge': {'type': self.CHARGE_MODE['return']}})
+        super().__init__('Charge', {'charge': {'type': CHARGE_MODE_TO_ECOVACS['return']}})
 
 
 class Move(VacBotCommand):
     def __init__(self, action):
         super().__init__('Move', {'move': {'action': self.ACTION[action]}})
+
+
+class PlaySound(VacBotCommand):
+    def __init__(self, sid="0"):
+        super().__init__('PlaySound', {'sid': sid})
 
 
 class GetCleanState(VacBotCommand):
@@ -365,7 +542,7 @@ class GetBatteryState(VacBotCommand):
 
 class GetLifeSpan(VacBotCommand):
     def __init__(self, component):
-        super().__init__('GetLifeSpan', {'type': self.COMPONENT[component]})
+        super().__init__('GetLifeSpan', {'type': COMPONENT_TO_ECOVACS[component]})
 
 
 class SetTime(VacBotCommand):
