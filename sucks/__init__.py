@@ -293,7 +293,10 @@ class VacBot():
                 logging.warning("Unknown fan speed: '" + fan + "'")
         self.fan_speed = fan
         self.statusEvents.notify(self.vacuum_status)
-        logging.debug("*** clean_status = " + self.clean_status + " fan_speed = " + self.fan_speed)
+        if self.fan_speed:
+            logging.debug("*** clean_status = " + self.clean_status + " fan_speed = " + self.fan_speed)
+        else:
+            logging.debug("*** clean_status = " + self.clean_status + " fan_speed = None")
 
     def _handle_battery_info(self, iq):
         try:
@@ -310,15 +313,15 @@ class VacBot():
             status = CHARGE_MODE_FROM_ECOVACS[status]
         except KeyError:
             logging.warning("Unknown charging status '" + status + "'")
-        else:
-            self.charge_status = status
-            if status != 'idle' or self.vacuum_status == 'charging':
-                # We have to ignore the idle messages, because all it means is that it's not
-                # currently charging, in which case the clean_status is a better indicator
-                # of what the vacuum is currently up to.
-                self.vacuum_status = status
-                self.statusEvents.notify(self.vacuum_status)
-            logging.debug("*** charge_status = " + self.charge_status)
+
+        self.charge_status = status
+        if status != 'idle' or self.vacuum_status == 'charging':
+            # We have to ignore the idle messages, because all it means is that it's not
+            # currently charging, in which case the clean_status is a better indicator
+            # of what the vacuum is currently up to.
+            self.vacuum_status = status
+            self.statusEvents.notify(self.vacuum_status)
+        logging.debug("*** charge_status = " + self.charge_status)
 
     def _vacuum_address(self):
         return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
@@ -337,9 +340,14 @@ class VacBot():
         else:
             self._failed_pings = 0
             if self._monitor:
-                # If we don't yet have a vacuum status, request initial statuses again, now that the ping succeeded
+                # If we don't yet have a vacuum status, request initial statuses again now that the ping succeeded
                 if self.vacuum_status == 'offline' or self.vacuum_status is None:
                     self.request_all_statuses()
+            else:
+                # If we're not auto-monitoring the status, then just reset the status to None, which indicates unknown
+                if self.vacuum_status == 'offline':
+                    self.vacuum_status = None
+                    self.statusEvents.notify(self.vacuum_status)
 
     def refresh_components(self):
         try:

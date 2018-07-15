@@ -59,6 +59,18 @@ def test_stop_command():
                   b'<ctl td="Clean"><clean speed="standard" type="stop" /></ctl>')
 
 
+def test_play_sound_command():
+    c = PlaySound()
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl sid="0" td="PlaySound" />')
+
+
+def test_play_sound_command_with_sid():
+    c = PlaySound(sid="1")
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl sid="1" td="PlaySound" />')
+
+
 def test_get_clean_state_command():
     c = GetCleanState()
     assert_equals(ElementTree.tostring(c.to_xml()),
