@@ -5,3 +5,7 @@ scratch*
 .idea
 build
 dist
+
+# Nosetests files
+cover/
+.coverage
