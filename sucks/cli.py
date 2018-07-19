@@ -53,7 +53,7 @@ class TimeWait(BotWait):
         self.seconds = seconds
 
     def wait(self, bot):
-        click.echo("waiting for " + str(self.seconds) + "s")
+        click.echo("Waiting for " + str(self.seconds) + "s")
         time.sleep(self.seconds)
 
 
@@ -66,11 +66,11 @@ class StatusWait(BotWait):
     def wait(self, bot):
         if not hasattr(bot, self.wait_on):
             raise ValueError("object " + bot + " does not have method " + self.wait_on)
-        logging.debug("waiting on " + self.wait_on + " for value " + self.wait_for)
+        logging.debug("Waiting on " + self.wait_on + " for value " + self.wait_for)
 
         while getattr(bot, self.wait_on) != self.wait_for:
             time.sleep(0.5)
-        logging.debug("wait complete; " + self.wait_on + " is now " + self.wait_for)
+        logging.debug("Wait complete; " + self.wait_on + " is now " + self.wait_for)
 
 
 class CliAction:
@@ -134,14 +134,14 @@ def cli(debug):
 
 
 @cli.command(help='logs in with specified email; run this first')
-@click.option('--email', prompt='Ecovacs app email')
-@click.option('--password', prompt='Ecovacs app password', hide_input=True)
-@click.option('--country-code', prompt='your two-letter country code', default=lambda: current_country())
-@click.option('--continent-code', prompt='your two-letter continent code',
+@click.option('--email', prompt='EcoVacs app email')
+@click.option('--password', prompt='EcoVacs app password', hide_input=True)
+@click.option('--country-code', prompt='Two-letter country code', default=lambda: current_country())
+@click.option('--continent-code', prompt='Two-letter continent code',
               default=lambda: continent_for_country(click.get_current_context().params['country_code']))
 def login(email, password, country_code, continent_code):
-    if config_file_exists() and not click.confirm('overwrite existing config?'):
-        click.echo("Skipping login.")
+    if config_file_exists() and not click.confirm('Overwrite existing config?'):
+        click.echo("Skipping login...")
         exit(0)
     config = OrderedDict()
     password_hash = EcoVacsAPI.md5(password)
