@@ -10,6 +10,8 @@ from pycountry_convert import country_alpha2_to_continent_code
 
 from sucks import *
 
+_LOGGER = logging.getLogger(__name__)
+
 
 class FrequencyParamType(click.ParamType):
     name = 'frequency'
@@ -66,11 +68,11 @@ class StatusWait(BotWait):
     def wait(self, bot):
         if not hasattr(bot, self.wait_on):
             raise ValueError("object " + bot + " does not have method " + self.wait_on)
-        logging.debug("waiting on " + self.wait_on + " for value " + self.wait_for)
+        _LOGGER.debug("waiting on " + self.wait_on + " for value " + self.wait_for)
 
         while getattr(bot, self.wait_on) != self.wait_for:
             time.sleep(0.5)
-        logging.debug("wait complete; " + self.wait_on + " is now " + self.wait_for)
+        _LOGGER.debug("wait complete; " + self.wait_on + " is now " + self.wait_for)
 
 
 class CliAction:
@@ -122,15 +124,15 @@ def should_run(frequency):
         return True
     n = random.random()
     result = n <= frequency
-    logging.debug("tossing coin: {:0.3f} <= {:0.3f}: {}".format(n, frequency, result))
+    _LOGGER.debug("tossing coin: {:0.3f} <= {:0.3f}: {}".format(n, frequency, result))
     return result
 
 
 @click.group(chain=True)
 @click.option('--debug/--no-debug', default=False)
 def cli(debug):
-    level = logging.DEBUG if debug else logging.ERROR
-    logging.basicConfig(level=level, format='%(levelname)-8s %(message)s')
+    logging.basicConfig(format='%(name)-10s %(levelname)-8s %(message)s')
+    _LOGGER.parent.setLevel(logging.DEBUG if debug else logging.ERROR)
 
 
 @cli.command(help='logs in with specified email; run this first')
@@ -202,7 +204,7 @@ def run(actions, debug):
         exit(1)
 
     if debug:
-        logging.debug("will run {}".format(actions))
+        _LOGGER.debug("will run {}".format(actions))
 
     if actions:
         config = read_config()
