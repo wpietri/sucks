@@ -95,6 +95,40 @@ def test_lifespan_reports():
     v._handle_ctl({'event': 'life_span', 'type': 'a_weird_component', 'total': '100', 'val': '87'})
     assert_equals({'side_brush': 0, 'main_brush': 0.005, 'a_weird_component': 0.87}, v.components)
 
+def test_is_cleaning():
+    v = a_vacbot()
+
+    assert_false(v.is_cleaning)
+
+    v._handle_ctl({'event': 'clean_report', 'type': 'auto', 'speed': 'strong'})
+    assert_true(v.is_cleaning)
+
+    v._handle_ctl({'event': 'clean_report', 'type': 'stop'})
+    assert_false(v.is_cleaning)
+
+    v._handle_ctl({'event': 'clean_report', 'type': 'edge', 'speed': 'normal'})
+    assert_true(v.is_cleaning)
+
+    v._handle_ctl({'event': 'charge_state', 'type': 'going'})
+    assert_false(v.is_cleaning)
+
+def test_is_charging():
+    v = a_vacbot()
+
+    assert_false(v.is_charging)
+
+    v._handle_ctl({'event': 'clean_report', 'type': 'auto', 'speed': 'strong'})
+    assert_false(v.is_charging)
+
+    v._handle_ctl({'event': 'charge_state', 'type': 'going'})
+    assert_false(v.is_charging)
+
+    v._handle_ctl({'event': 'charge_state', 'type': 'slot_charging'})
+    assert_true(v.is_charging)
+
+    v._handle_ctl({'event': 'clean_report', 'type': 'edge', 'speed': 'normal'})
+    assert_false(v.is_charging)
+
 def test_send_ping_no_monitor():
     v = a_vacbot()
 

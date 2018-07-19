@@ -11,58 +11,86 @@ from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
 from sleekxmpp.exceptions import XMPPError
 
-# These consts convert to and from Sucks's consts (which closely match what the UI and manuals use)
+_LOGGER = logging.getLogger(__name__)
+
+# These consts define all of the vocabulary used by this library when presenting various states and components.
+# Applications implementing this library should import these rather than hard-code the strings, for future-proofing.
+
+CLEAN_MODE_AUTO = 'auto'
+CLEAN_MODE_EDGE = 'edge'
+CLEAN_MODE_SPOT = 'spot'
+CLEAN_MODE_SINGLE_ROOM = 'single_room'
+CLEAN_MODE_STOP = 'stop'
+
+FAN_SPEED_NORMAL = 'normal'
+FAN_SPEED_HIGH = 'high'
+
+CHARGE_MODE_RETURN = 'return'
+CHARGE_MODE_RETURNING = 'returning'
+CHARGE_MODE_CHARGING = 'charging'
+CHARGE_MODE_IDLE = 'idle'
+
+COMPONENT_SIDE_BRUSH = 'side_brush'
+COMPONENT_MAIN_BRUSH = 'main_brush'
+COMPONENT_FILTER = 'filter'
+
+VACUUM_STATUS_OFFLINE = 'offline'
+
+CLEANING_STATES = {CLEAN_MODE_AUTO, CLEAN_MODE_EDGE, CLEAN_MODE_SPOT, CLEAN_MODE_SINGLE_ROOM}
+CHARGING_STATES = {CHARGE_MODE_CHARGING}
+
+# These dictionaries convert to and from Sucks's consts (which closely match what the UI and manuals use)
 # to and from what the Ecovacs API uses (which are sometimes very oddly named and have random capitalization.)
 CLEAN_MODE_TO_ECOVACS = {
-    'auto': 'auto',
-    'edge': 'border',
-    'spot': 'spot',
-    'single_room': 'singleroom',
-    'stop': 'stop'
+    CLEAN_MODE_AUTO: 'auto',
+    CLEAN_MODE_EDGE: 'border',
+    CLEAN_MODE_SPOT: 'spot',
+    CLEAN_MODE_SINGLE_ROOM: 'singleroom',
+    CLEAN_MODE_STOP: 'stop'
 }
 
 CLEAN_MODE_FROM_ECOVACS = {
-    'auto': 'auto',
-    'border': 'edge',
-    'spot': 'spot',
-    'singleroom': 'single_room',
-    'stop': 'stop',
-    'going': 'returning'
+    'auto': CLEAN_MODE_AUTO,
+    'border': CLEAN_MODE_EDGE,
+    'spot': CLEAN_MODE_SPOT,
+    'singleroom': CLEAN_MODE_SINGLE_ROOM,
+    'stop': CLEAN_MODE_STOP,
+    'going': CHARGE_MODE_RETURNING
 }
 
 FAN_SPEED_TO_ECOVACS = {
-    'normal': 'standard',
-    'high': 'strong'
+    FAN_SPEED_NORMAL: 'standard',
+    FAN_SPEED_HIGH: 'strong'
 }
 
 FAN_SPEED_FROM_ECOVACS = {
-    'standard': 'normal',
-    'strong': 'high'
+    'standard': FAN_SPEED_NORMAL,
+    'strong': FAN_SPEED_HIGH
 }
 
 CHARGE_MODE_TO_ECOVACS = {
-    'return': 'go',
-    'returning': 'Going',
-    'charging': 'SlotCharging',
-    'idle': 'Idle'
+    CHARGE_MODE_RETURN: 'go',
+    CHARGE_MODE_RETURNING: 'Going',
+    CHARGE_MODE_CHARGING: 'SlotCharging',
+    CHARGE_MODE_IDLE: 'Idle'
 }
 
 CHARGE_MODE_FROM_ECOVACS = {
-    'going': 'returning',
-    'slot_charging': 'charging',
-    'idle': 'idle'
+    'going': CHARGE_MODE_RETURNING,
+    'slot_charging': CHARGE_MODE_CHARGING,
+    'idle': CHARGE_MODE_IDLE
 }
 
 COMPONENT_TO_ECOVACS = {
-    'main_brush': 'Brush',
-    'side_brush': 'SideBrush',
-    'filter': 'DustCaseHeap'
+    COMPONENT_MAIN_BRUSH: 'Brush',
+    COMPONENT_SIDE_BRUSH: 'SideBrush',
+    COMPONENT_FILTER: 'DustCaseHeap'
 }
 
 COMPONENT_FROM_ECOVACS = {
-    'brush': 'main_brush',
-    'side_brush': 'side_brush',
-    'dust_case_heap': 'filter'
+    'brush': COMPONENT_MAIN_BRUSH,
+    'side_brush': COMPONENT_SIDE_BRUSH,
+    'dust_case_heap': COMPONENT_FILTER
 }
 
 class EcoVacsAPI:
@@ -83,7 +111,7 @@ class EcoVacsAPI:
             'channel': 'c_googleplay',
             'deviceType': '1'
         }
-        logging.debug("Setting up EcoVacsAPI")
+        _LOGGER.debug("Setting up EcoVacsAPI")
         self.resource = device_id[0:8]
         self.country = country
         self.continent = continent
@@ -96,7 +124,7 @@ class EcoVacsAPI:
                                               ('uid', self.uid),
                                               ('accessToken', self.login_access_token))['authCode']
         self.user_access_token = self.__call_login_by_it_token()['token']
-        logging.debug("EcoVacsAPI connection complete")
+        _LOGGER.debug("EcoVacsAPI connection complete")
 
     def __sign(self, params):
         result = params.copy()
@@ -113,34 +141,34 @@ class EcoVacsAPI:
         return result
 
     def __call_main_api(self, function, *args):
-        logging.debug("calling main api {} with {}".format(function, args))
+        _LOGGER.debug("calling main api {} with {}".format(function, args))
         params = OrderedDict(args)
         params['requestId'] = self.md5(time.time())
         url = (EcoVacsAPI.MAIN_URL_FORMAT + "/" + function).format(**self.meta)
         api_response = requests.get(url, self.__sign(params))
         json = api_response.json()
-        logging.debug("got {}".format(json))
+        _LOGGER.debug("got {}".format(json))
         if json['code'] == '0000':
             return json['data']
         elif json['code'] == '1005':
-            logging.warning("incorrect email or password")
+            _LOGGER.warning("incorrect email or password")
             raise ValueError("incorrect email or password")
         else:
-            logging.error("call to {} failed with {}".format(function, json))
+            _LOGGER.error("call to {} failed with {}".format(function, json))
             raise RuntimeError("failure code {} ({}) for call {} and parameters {}".format(
                 json['code'], json['msg'], function, args))
 
     def __call_user_api(self, function, args):
-        logging.debug("calling user api {} with {}".format(function, args))
+        _LOGGER.debug("calling user api {} with {}".format(function, args))
         params = {'todo': function}
         params.update(args)
         response = requests.post(EcoVacsAPI.USER_URL_FORMAT.format(continent=self.continent), json=params)
         json = response.json()
-        logging.debug("got {}".format(json))
+        _LOGGER.debug("got {}".format(json))
         if json['result'] == 'ok':
             return json
         else:
-            logging.error("call to {} failed with {}".format(function, json))
+            _LOGGER.error("call to {} failed with {}".format(function, json))
             raise RuntimeError(
                 "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], function, params))
 
@@ -259,14 +287,14 @@ class VacBot():
     def _handle_error(self, event):
         error = event['error']
         self.errorEvents.notify(error)
-        logging.debug("*** error = " + error)
+        _LOGGER.debug("*** error = " + error)
 
     def _handle_life_span(self, event):
         type = event['type']
         try:
             type = COMPONENT_FROM_ECOVACS[type]
         except KeyError:
-            logging.warning("Unknown component type: '" + type + "'")
+            _LOGGER.warning("Unknown component type: '" + type + "'")
 
         total = float(event['total'])
         val = float(event['val'])
@@ -275,14 +303,14 @@ class VacBot():
 
         lifespan_event = {'type': type, 'lifespan': lifespan}
         self.lifespanEvents.notify(lifespan_event)
-        logging.debug("*** life_span " + type + " = " + str(lifespan))
+        _LOGGER.debug("*** life_span " + type + " = " + str(lifespan))
 
     def _handle_clean_report(self, event):
         type = event['type']
         try:
             type = CLEAN_MODE_FROM_ECOVACS[type]
         except KeyError:
-            logging.warning("Unknown cleaning status '" + type + "'")
+            _LOGGER.warning("Unknown cleaning status '" + type + "'")
         self.clean_status = type
         self.vacuum_status = type
         fan = event.get('speed', None)
@@ -290,29 +318,29 @@ class VacBot():
             try:
                 fan = FAN_SPEED_FROM_ECOVACS[fan]
             except KeyError:
-                logging.warning("Unknown fan speed: '" + fan + "'")
+                _LOGGER.warning("Unknown fan speed: '" + fan + "'")
         self.fan_speed = fan
         self.statusEvents.notify(self.vacuum_status)
         if self.fan_speed:
-            logging.debug("*** clean_status = " + self.clean_status + " fan_speed = " + self.fan_speed)
+            _LOGGER.debug("*** clean_status = " + self.clean_status + " fan_speed = " + self.fan_speed)
         else:
-            logging.debug("*** clean_status = " + self.clean_status + " fan_speed = None")
+            _LOGGER.debug("*** clean_status = " + self.clean_status + " fan_speed = None")
 
     def _handle_battery_info(self, iq):
         try:
             self.battery_status = float(iq['power']) / 100
         except ValueError:
-            logging.warning("couldn't parse battery status " + ET.tostring(iq))
+            _LOGGER.warning("couldn't parse battery status " + ET.tostring(iq))
         else:
             self.batteryEvents.notify(self.battery_status)
-            logging.debug("*** battery_status = {:.0%}".format(self.battery_status))
+            _LOGGER.debug("*** battery_status = {:.0%}".format(self.battery_status))
 
     def _handle_charge_state(self, event):
         status = event['type']
         try:
             status = CHARGE_MODE_FROM_ECOVACS[status]
         except KeyError:
-            logging.warning("Unknown charging status '" + status + "'")
+            _LOGGER.warning("Unknown charging status '" + status + "'")
 
         self.charge_status = status
         if status != 'idle' or self.vacuum_status == 'charging':
@@ -321,18 +349,26 @@ class VacBot():
             # of what the vacuum is currently up to.
             self.vacuum_status = status
             self.statusEvents.notify(self.vacuum_status)
-        logging.debug("*** charge_status = " + self.charge_status)
+        _LOGGER.debug("*** charge_status = " + self.charge_status)
 
     def _vacuum_address(self):
         return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
+
+    @property
+    def is_charging(self) -> bool:
+        return self.vacuum_status in CHARGING_STATES
+
+    @property
+    def is_cleaning(self) -> bool:
+        return self.vacuum_status in CLEANING_STATES
 
     def send_ping(self):
         try:
             self.xmpp.send_ping(self._vacuum_address())
         except XMPPError as err:
-            logging.warning("Ping did not reach VacBot. Will retry.")
-            logging.debug("*** Error type: " + err.etype)
-            logging.debug("*** Error condition: " + err.condition)
+            _LOGGER.warning("Ping did not reach VacBot. Will retry.")
+            _LOGGER.debug("*** Error type: " + err.etype)
+            _LOGGER.debug("*** Error condition: " + err.condition)
             self._failed_pings += 1
             if self._failed_pings >= 4:
                 self.vacuum_status = 'offline'
@@ -355,9 +391,9 @@ class VacBot():
             self.run(GetLifeSpan('side_brush'))
             self.run(GetLifeSpan('filter'))
         except XMPPError as err:
-            logging.warning("Component refresh requests failed to reach VacBot. Will try again later.")
-            logging.debug("*** Error type: " + err.etype)
-            logging.debug("*** Error condition: " + err.condition)
+            _LOGGER.warning("Component refresh requests failed to reach VacBot. Will try again later.")
+            _LOGGER.debug("*** Error type: " + err.etype)
+            _LOGGER.debug("*** Error condition: " + err.condition)
 
     def request_all_statuses(self):
         try:
@@ -365,9 +401,9 @@ class VacBot():
             self.run(GetChargeState())
             self.run(GetBatteryState())
         except XMPPError as err:
-            logging.warning("Initial status requests failed to reach VacBot. Will try again on next ping.")
-            logging.debug("*** Error type: " + err.etype)
-            logging.debug("*** Error condition: " + err.condition)
+            _LOGGER.warning("Initial status requests failed to reach VacBot. Will try again on next ping.")
+            _LOGGER.debug("*** Error type: " + err.etype)
+            _LOGGER.debug("*** Error condition: " + err.condition)
         else:
             self.refresh_components()
 
@@ -402,8 +438,8 @@ class EcoVacsXMPP(ClientXMPP):
         self.ready_flag.wait()
 
     def session_start(self, event):
-        logging.debug("----------------- starting session ----------------")
-        logging.debug("event = {}".format(event))
+        _LOGGER.debug("----------------- starting session ----------------")
+        _LOGGER.debug("event = {}".format(event))
         self.register_handler(Callback("general",
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}'),
                                        self._handle_ctl))
@@ -440,7 +476,7 @@ class EcoVacsXMPP(ClientXMPP):
 
     def send_command(self, xml, recipient):
         c = self._wrap_command(xml, recipient)
-        logging.debug('Sending command {0}'.format(c))
+        _LOGGER.debug('Sending command {0}'.format(c))
         c.send()
 
     def _wrap_command(self, ctl, recipient):
@@ -457,7 +493,7 @@ class EcoVacsXMPP(ClientXMPP):
     def send_ping(self, to):
         q = self.make_iq_get(ito=to, ifrom=self._my_address())
         q.xml.append(ET.Element('ping', {'xmlns': 'urn:xmpp:ping'}))
-        logging.debug("*** sending ping ***")
+        _LOGGER.debug("*** sending ping ***")
         q.send()
 
     def connect_and_wait_until_ready(self):
