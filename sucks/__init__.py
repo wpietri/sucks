@@ -296,9 +296,7 @@ class VacBot():
         except KeyError:
             _LOGGER.warning("Unknown component type: '" + type + "'")
 
-        total = float(event['total'])
-        val = float(event['val'])
-        lifespan = val / total
+        lifespan = int(event['val']) / 100
         self.components[type] = lifespan
 
         lifespan_event = {'type': type, 'lifespan': lifespan}
