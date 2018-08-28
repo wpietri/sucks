@@ -83,17 +83,19 @@ def test_lifespan_reports():
     v = a_vacbot()
     assert_equals({}, v.components)
 
+    # Note: The "total" values don't seem to have any meaning
+
     v._handle_ctl({'event': 'life_span', 'type': 'side_brush', 'total': '100', 'val': '50'})
     assert_equals({'side_brush': 0.5}, v.components)
 
     v._handle_ctl({'event': 'life_span', 'type': 'brush', 'total': '200', 'val': '1'})
-    assert_equals({'side_brush': 0.5, 'main_brush': 0.005}, v.components)
+    assert_equals({'side_brush': 0.5, 'main_brush': 0.01}, v.components)
 
     v._handle_ctl({'event': 'life_span', 'type': 'side_brush', 'total': '100', 'val': '0'})
-    assert_equals({'side_brush': 0, 'main_brush': 0.005}, v.components)
+    assert_equals({'side_brush': 0, 'main_brush': 0.01}, v.components)
 
     v._handle_ctl({'event': 'life_span', 'type': 'a_weird_component', 'total': '100', 'val': '87'})
-    assert_equals({'side_brush': 0, 'main_brush': 0.005, 'a_weird_component': 0.87}, v.components)
+    assert_equals({'side_brush': 0, 'main_brush': 0.01, 'a_weird_component': 0.87}, v.components)
 
 def test_is_cleaning():
     v = a_vacbot()
