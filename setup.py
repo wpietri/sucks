@@ -11,7 +11,7 @@ try:
     with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
         long_description = f.read()
 except FileNotFoundError:
-    print("can't find python README; skipping")
+    print("Unable to find README; skipping...")
 
 setup(
     name='sucks',
