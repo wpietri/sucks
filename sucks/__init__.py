@@ -194,6 +194,30 @@ class EcoVacsAPI:
         })['devices']
         return devices
 
+	
+    @staticmethod
+    def logout_user(user_continent, args): 
+        
+        params = {'todo': 'logout'}
+        params.update(args)
+        
+        logging.debug("logging out user {} with data {}".format(params['userId'], params))
+        response = requests.post(EcoVacsAPI.USER_URL_FORMAT.format(continent=user_continent.upper()), json=params)
+
+        json = response.json()
+        logging.debug("got {}".format(json))
+        
+        if json['result'] == 'ok':
+            return json
+        elif json['errno'] == 1013:
+            logging.warning("token error on logout response, might already be logged out?")
+            return json
+        else:
+            logging.error("call to {} failed with {}".format('logout', json))
+            raise RuntimeError(
+                "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], 'logout', params))
+		
+		
     @staticmethod
     def md5(text):
         return hashlib.md5(bytes(str(text), 'utf8')).hexdigest()
