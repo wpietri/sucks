@@ -123,8 +123,12 @@ class EcoVacsAPI:
         self.auth_code = self.__call_main_api('user/getAuthCode',
                                               ('uid', self.uid),
                                               ('accessToken', self.login_access_token))['authCode']
-        self.user_access_token = self.__call_login_by_it_token()['token']
-        _LOGGER.debug("EcoVacsAPI connection complete")
+        login_response = self.__call_login_by_it_token()
+        self.user_access_token = login_response['token']
+        if login_response['userId'] != self.uid:
+            logging.debug("Switching to shorter UID " + login_response['userId'])
+            self.uid = login_response['userId']
+        logging.debug("EcoVacsAPI connection complete")
 
     def __sign(self, params):
         result = params.copy()
