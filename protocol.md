@@ -66,6 +66,10 @@ for; my script skips this and seems to work fine
 from step 4, gets the list of devices; that's needed for talking to the
 vacuum via XMPP
 
+Under mysterious circumstances, for some people the getAuthCode call will
+return a different userId than is passed in. In that case, apparently the
+new userId should be used for future calls, or an Auth 1004 error results.
+
 
 ## XMPP 
 
