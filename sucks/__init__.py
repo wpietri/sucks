@@ -490,7 +490,7 @@ class EcoVacsXMPP(ClientXMPP):
                 return q
 
     def _my_address(self):
-        return self.user + '@' + self.domain + '/' + self.resource
+        return self.user + '@' + self.domain + '/' + self.boundjid.resource
 
     def send_ping(self, to):
         q = self.make_iq_get(ito=to, ifrom=self._my_address())
