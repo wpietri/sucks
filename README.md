@@ -124,6 +124,9 @@ new functionality.
 
 For more information see [the development documentation](developing.md)
 
+## See also
+
+There is also a [Javascript port](https://github.com/joostth/sucks.js) of this library.
 
 ## Thanks
 
