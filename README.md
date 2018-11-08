@@ -126,7 +126,8 @@ For more information see [the development documentation](developing.md)
 
 ## See also
 
-There is also a [Javascript port](https://github.com/joostth/sucks.js) of this library.
+There are now similar libraries in [Javascript](https://github.com/joostth/sucks.js)
+and [Go](https://github.com/skburgart/go-vacbot).
 
 ## Thanks
 
