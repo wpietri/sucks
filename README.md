@@ -37,7 +37,7 @@ With that ready, step one is to log in:
     Ecovacs app email: [your email]
     Ecovacs app password: [your password]
     your two-letter country code: us
-    your two-letter contienent code: na
+    your two-letter continent code: na
     Config saved.
 ```
 
