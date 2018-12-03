@@ -118,11 +118,14 @@ vacbot.run(Charge()) # return to the charger
 ## Developing
 
 If you'd like to join in on developing, I recommend checking out the code,
-[setting up a virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtualenv/),
-and doing `pip install -e .`. You can run the existing tests using
-`nosetests`. Please add tests for any new functionality.
+setting up a virtual environment, and installing this package in editable
+mode. You can confirm your environment works by running the tests. And please
+do join the [mailing list](https://groups.google.com/forum/#!forum/sucks-users)
+to discuss your plans.
 
-For more information see [the development documentation](developing.md)
+For more information see [the development documentation](developing.md).
+
+
 
 ## See also
 
