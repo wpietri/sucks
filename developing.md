@@ -7,10 +7,29 @@ For a description of the Ecovacs API protocols, see
 ## Getting started with Sucks
 
 If you'd like to join in on developing, I recommend checking out the code,
-setting up a virtual environment, and doing `pip install -e .`. You can
-run the existing tests using `nosetests`. Current test are not yet
+[setting up a virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtualenv/),
+and installing this package in dev mode. You can confirm your environment
+works by running the tests. The commands for that look something like
+like
+
+```
+% python3 -m virtualenv env
+% source env/bin/activate
+% pip install -e .[dev]
+% nosetests
+```
+
+If the test run is successful, it will say something like
+
+```
+Ran 44 tests in 0.734s
+
+OK
+```
+
+Current test are not yet
 comprehensive, as the integrated nature of this makes it difficult.
-But I aim to reduce that problem over time, so please add tests as you go.
+But we aim to reduce that problem over time, so please add tests as you go.
 
 
 ## MITM XMPP traffic between the Android or iOS App and the Ecovacs server
