@@ -118,9 +118,9 @@ vacbot.run(Charge()) # return to the charger
 ## Developing
 
 If you'd like to join in on developing, I recommend checking out the code,
-setting up a virtual environment, and doing `pip install -e .`. You can
-run the existing tests using `nosetests`. Please add tests for any
-new functionality.
+[setting up a virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtualenv/),
+and doing `pip install -e .`. You can run the existing tests using
+`nosetests`. Please add tests for any new functionality.
 
 For more information see [the development documentation](developing.md)
 
