@@ -452,6 +452,7 @@ class EcoVacsXMPP(ClientXMPP):
 
     def _handle_ctl(self, message):
         the_good_part = message.get_payload()[0][0]
+        _LOGGER.debug('Message payload: ' + ET.tostring(the_good_part, method='xml').decode())
         as_dict = self._ctl_to_dict(the_good_part)
         if as_dict is not None:
             for s in self.ctl_subscribers:
@@ -461,11 +462,29 @@ class EcoVacsXMPP(ClientXMPP):
         result = xml.attrib.copy()
         if 'td' not in result:
             # This happens for commands with no response data, such as PlaySound
-            return
+            # Handle response data with no 'td'
 
-        result['event'] = result.pop('td')
-        if xml:
-            result.update(xml[0].attrib)
+         #   return
+            if 'type' in result: # single element with type and val
+                result['event'] = "LifeSpan" # seems to always ben LifeSpan type
+
+            else:
+                if len(xml) > 0: # case where there is child element
+                    if 'clean' in xml[0].tag:
+                        result['event'] = "CleanReport"
+                    elif 'charge' in xml[0].tag:
+                        result['event'] = "ChargeState"
+                    elif 'battery' in xml[0].tag:
+                        result['event'] = "BatteryInfo"
+                    else:
+                        return
+                    result.update(xml[0].attrib)
+                else: # for non-'type' result with no child element, e.g., result of PlaySound
+                    return
+        else: # response includes 'td'
+            result['event'] = result.pop('td')
+            if xml:
+                result.update(xml[0].attrib)
 
         for key in result:
             result[key] = stringcase.snakecase(result[key])
