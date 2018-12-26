@@ -50,7 +50,22 @@ def test_xml_to_dict():
     assert_dict_equal(
         x._ctl_to_dict(make_ctl('# <ctl td="LifeSpan" type="Brush" val="099" total="365"/>')),
         {'event': 'life_span', 'type': 'brush', 'val': '099', 'total': '365'})
+    # set of xml responses without the td attrib
+    assert_dict_equal(
+        x._ctl_to_dict(make_ctl('<ctl type="DustCaseHeap" val="050" total="365"/>')),
+        {'event': 'life_span', 'type': 'dust_case_heap', 'val': '050', 'total': '365'})
 
+    assert_dict_equal(
+        x._ctl_to_dict(make_ctl('<ctl ret="ok" errno=""><battery power="099"/></ctl>')),
+        {'event': 'battery_info', 'power': '099', 'ret': 'ok', 'errno': ''})
+
+    assert_dict_equal(
+        x._ctl_to_dict(make_ctl('<ctl ret="ok" errno=""><clean type="stop" speed="strong" st="h" t="" a=""/></ctl>')),
+        {'event': 'clean_report', 'type': 'stop', 'speed': 'strong', 'st':'h', 't': '', 'a': '', 'ret':'ok', 'errno': ''})
+
+    assert_dict_equal(
+        x._ctl_to_dict(make_ctl('<ctl ret="ok" errno=""><charge type="SlotCharging"/></ctl>')),
+        {'event': 'charge_state', 'type': 'slot_charging', 'ret': 'ok', 'errno': ''})
 
 def make_ecovacs_xmpp():
     return EcoVacsXMPP('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na')
