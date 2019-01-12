@@ -99,6 +99,13 @@ class EcoVacsAPI:
     PUBLIC_KEY = 'MIIB/TCCAWYCCQDJ7TMYJFzqYDANBgkqhkiG9w0BAQUFADBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMCAXDTE3MDUwOTA1MTkxMFoYDzIxMTcwNDE1MDUxOTEwWjBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDb8V0OYUGP3Fs63E1gJzJh+7iqeymjFUKJUqSD60nhWReZ+Fg3tZvKKqgNcgl7EGXp1yNifJKUNC/SedFG1IJRh5hBeDMGq0m0RQYDpf9l0umqYURpJ5fmfvH/gjfHe3Eg/NTLm7QEa0a0Il2t3Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GCSqGSIb3DQEBBQUAA4GBANhIMT0+IyJa9SU8AEyaWZZmT2KEYrjakuadOvlkn3vFdhpvNpnnXiL+cyWy2oU1Q9MAdCTiOPfXmAQt8zIvP2JC8j6yRTcxJCvBwORDyv/uBtXFxBPEC6MDfzU2gKAaHeeJUWrzRv34qFSaYkYta8canK+PSInylQTjJK9VqmjQ'
     MAIN_URL_FORMAT = 'https://eco-{country}-api.ecovacs.com/v1/private/{country}/{lang}/{deviceId}/{appCode}/{appVersion}/{channel}/{deviceType}'
     USER_URL_FORMAT = 'https://users-{continent}.ecouser.net:8000/user.do'
+    PORTAL_URL_FORMAT = 'https://portal-{continent}.ecouser.net/api'
+
+    USERSAPI = 'users/user.do'
+    IOTDEVMANAGERAPI = 'iot/devmanager.do' # IOT Device Manager - This provides control of "IOT" products via API, no longer XMPP
+    PRODUCTAPI = 'pim/product' # Leaving this open, the only endpoint known currently is "Product IOT Map" -  pim/product/getProductIotMap - This provides a list of "IOT" products, which is assumed should use IOT API instead of XMPP
+        
+      
     REALM = 'ecouser.net'
 
     def __init__(self, device_id, account_id, password_hash, country, continent):
@@ -176,8 +183,43 @@ class EcoVacsAPI:
             raise RuntimeError(
                 "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], function, params))
 
+    def __call_portal_api(self, api, function, args):
+        _LOGGER.debug("calling portal api {} function {} with {}".format(api, function, args))
+        if api == self.USERSAPI:
+            params = {'todo': function}
+            params.update(args)
+        else:
+            params = {}
+            params.update(args)
+
+        url = (EcoVacsAPI.PORTAL_URL_FORMAT + "/" + api).format(continent=self.continent, **self.meta)
+        response = requests.post(url, json=params)
+        json = response.json()
+        _LOGGER.debug("got {}".format(json))
+        if api == self.USERSAPI:    
+            if json['result'] == 'ok':
+                return json
+        
+        if api == self.IOTDEVMANAGERAPI:    
+            if json['ret'] == 'ok':
+                return json
+            elif json['ret'] == 'fail' and json['debug'] == 'wait for response timed out': #Maybe handle timeout for IOT better in the future
+                _LOGGER.error("call to {} failed with {}".format(function, json))
+                return {}
+                #raise RuntimeError(
+                #    "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], function, params))
+
+        if api.startswith(self.PRODUCTAPI):
+            if json['code'] == 0:
+                return json      
+
+        else:
+            _LOGGER.error("call to {} failed with {}".format(function, json))
+            raise RuntimeError(
+                "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], function, params))
+
     def __call_login_by_it_token(self):
-        return self.__call_user_api('loginByItToken',
+        return self.__call_portal_api(self.USERSAPI,'loginByItToken',
                                     {'country': self.meta['country'].upper(),
                                      'resource': self.resource,
                                      'realm': EcoVacsAPI.REALM,
@@ -186,7 +228,7 @@ class EcoVacsAPI:
                                     )
 
     def devices(self):
-        devices = self.__call_user_api('GetDeviceList', {
+        devices = self.__call_portal_api(self.USERSAPI,'GetDeviceList', {
             'userid': self.uid,
             'auth': {
                 'with': 'users',
@@ -196,7 +238,28 @@ class EcoVacsAPI:
                 'resource': self.resource
             }
         })['devices']
+
+        iotProducts = self.__call_portal_api(self.PRODUCTAPI + '/getProductIotMap','', {
+            'channel': '',
+            'auth': {
+                'with': 'users',
+                'userid': self.uid,
+                'realm': EcoVacsAPI.REALM,
+                'token': self.user_access_token,
+                'resource': self.resource
+            }
+        })['data']
+
+        for device in devices: #Check if the device is part of iotProducts and add an iot flag. 
+            for iotProducts in iotProducts:
+                if device['class'] == iotProducts['classid']:
+                    device['iot'] = True
+                else:
+                    device['iot'] = False
+
+        
         return devices
+       
 
     @staticmethod
     def md5(text):
@@ -270,13 +333,22 @@ class VacBot():
         self.lifespanEvents = EventEmitter()
         self.errorEvents = EventEmitter()
 
-        self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, server_address)
-        self.xmpp.subscribe_to_ctls(self._handle_ctl)
+        if vacuum['iot']:
+            self.iot = EcoVacsIOT(user, domain, resource, secret, continent, vacuum)
+            self.iot.subscribe_to_ctls(self._handle_ctl)
+        else:
+            self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, server_address)
+            self.xmpp.subscribe_to_ctls(self._handle_ctl)
+
 
     def connect_and_wait_until_ready(self):
-        self.xmpp.connect_and_wait_until_ready()
+        if self.vacuum['iot']:
+            self.iot.connect_and_wait_until_ready()
+            self.iot.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
 
-        self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
+        else:
+            self.xmpp.connect_and_wait_until_ready()
+            self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
 
         if self._monitor:
             # Do a first ping, which will also fetch initial statuses if the ping succeeds
@@ -300,9 +372,12 @@ class VacBot():
         except KeyError:
             _LOGGER.warning("Unknown component type: '" + type + "'")
 
-        lifespan = int(event['val']) / 100
+        if 'val' in event:
+            lifespan = int(event['val']) / 100
+        else:
+            lifespan = int(event['left'].replace("_","-")) / 60  #This works for a D901, I also ran into a negative number and had to replace _ with -
         self.components[type] = lifespan
-
+        #lifespan = str(int(int(event['left']) / 60) + " (" + int(int(event['left'])/int(event['total'])*100) + "%)")  #This works for a D901
         lifespan_event = {'type': type, 'lifespan': lifespan}
         self.lifespanEvents.notify(lifespan_event)
         _LOGGER.debug("*** life_span " + type + " = " + str(lifespan))
@@ -354,7 +429,10 @@ class VacBot():
         _LOGGER.debug("*** charge_status = " + self.charge_status)
 
     def _vacuum_address(self):
-        return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
+        if self.vacuum['iot']:
+            return self.vacuum['did']
+        else:
+            return self.vacuum['did'] + '@' + self.vacuum['class'] + '.ecorobot.net/atom'
 
     @property
     def is_charging(self) -> bool:
@@ -365,27 +443,31 @@ class VacBot():
         return self.vacuum_status in CLEANING_STATES
 
     def send_ping(self):
-        try:
-            self.xmpp.send_ping(self._vacuum_address())
-        except XMPPError as err:
-            _LOGGER.warning("Ping did not reach VacBot. Will retry.")
-            _LOGGER.debug("*** Error type: " + err.etype)
-            _LOGGER.debug("*** Error condition: " + err.condition)
-            self._failed_pings += 1
-            if self._failed_pings >= 4:
-                self.vacuum_status = 'offline'
-                self.statusEvents.notify(self.vacuum_status)
+        if self.vacuum['iot']:
+            #TODO
+            print("IOT Ping")
         else:
-            self._failed_pings = 0
-            if self._monitor:
-                # If we don't yet have a vacuum status, request initial statuses again now that the ping succeeded
-                if self.vacuum_status == 'offline' or self.vacuum_status is None:
-                    self.request_all_statuses()
-            else:
-                # If we're not auto-monitoring the status, then just reset the status to None, which indicates unknown
-                if self.vacuum_status == 'offline':
-                    self.vacuum_status = None
+            try:
+                self.xmpp.send_ping(self._vacuum_address())
+            except XMPPError as err:
+                _LOGGER.warning("Ping did not reach VacBot. Will retry.")
+                _LOGGER.debug("*** Error type: " + err.etype)
+                _LOGGER.debug("*** Error condition: " + err.condition)
+                self._failed_pings += 1
+                if self._failed_pings >= 4:
+                    self.vacuum_status = 'offline'
                     self.statusEvents.notify(self.vacuum_status)
+            else:
+                self._failed_pings = 0
+                if self._monitor:
+                    # If we don't yet have a vacuum status, request initial statuses again now that the ping succeeded
+                    if self.vacuum_status == 'offline' or self.vacuum_status is None:
+                        self.request_all_statuses()
+                else:
+                    # If we're not auto-monitoring the status, then just reset the status to None, which indicates unknown
+                    if self.vacuum_status == 'offline':
+                        self.vacuum_status = None
+                        self.statusEvents.notify(self.vacuum_status)
 
     def refresh_components(self):
         try:
@@ -409,15 +491,113 @@ class VacBot():
         else:
             self.refresh_components()
 
-    def send_command(self, xml):
-        self.xmpp.send_command(xml, self._vacuum_address())
+    def send_command(self, action):
+        if self.vacuum['iot']:
+            self.iot.send_command(action, self._vacuum_address())
+        else:
+            self.xmpp.send_command(action, self._vacuum_address())
 
     def run(self, action):
-        self.send_command(action.to_xml())
+        if self.vacuum['iot']:
+            self.send_command(action)
+        else:
+            self.send_command(action.to_xml())
 
     def disconnect(self, wait=False):
         self.xmpp.disconnect(wait=wait)
 
+class EcoVacsIOT():
+    def __init__(self, user, domain, resource, secret, continent, vacuum):
+        self.uid = user
+        self.domain = domain
+        self.resource = resource
+        self.secret = secret
+        self.continent = continent
+        self.vacuum = vacuum
+        self.api = EcoVacsAPI
+        self.api.continent = continent
+        self.api.meta = {}
+        #self.add_event_handler("session_start", self.session_start)
+        self.ctl_subscribers = []
+        self.ready_flag = Event()
+                   
+
+    def connect_and_wait_until_ready(self):
+        self.connect(EcoVacsAPI._EcoVacsAPI__call_portal_api())
+        self.process()
+        self.wait_until_ready()
+
+    def send_command(self, action, recipient):
+        c = self._wrap_command(action, recipient)
+        _LOGGER.debug('Sending command {0}'.format(c))
+        self._handle_ctl(action, self.api._EcoVacsAPI__call_portal_api(self.api, self.api.IOTDEVMANAGERAPI,'',c  ))
+        
+
+    def _wrap_command(self, cmd, recipient):
+      
+        q = {
+            'auth': {
+                'realm': EcoVacsAPI.REALM,
+                'resource': self.resource,
+                'token': self.secret,
+                'userid': self.uid,
+                'with': 'users',
+            },
+            "cmdName": cmd.name,
+            "payload": cmd.args_to_xml(),            
+            "payloadType": "x",
+            "td": "q",
+            "toId": recipient,
+            "toRes": self.vacuum['resource'],
+            "toType": self.vacuum['class']
+        }     
+
+        return q
+
+
+    def subscribe_to_ctls(self, function):
+        self.ctl_subscribers.append(function)
+
+   
+    def _handle_ctl(self, action, message):
+        resp = self._ctl_to_dict(action, message['resp'])
+        if resp is not None:
+            for s in self.ctl_subscribers:
+                s(resp)
+
+
+    def _ctl_to_dict(self, action, xmlstring):
+        xml = ET.fromstring(xmlstring)
+    
+        xmlchild = xml.getchildren()
+        if len(xmlchild) > 0:
+            result = xmlchild[0].attrib.copy()
+            #Fix for difference in XMPP vs IOT response
+            #Depending on the report will use the tag and add "report" to fit the mold of sucks library
+            if xmlchild[0].tag == "clean":
+                result['event'] = xmlchild[0].tag + "_report"
+            else: #Default back to replacing Get from the api cmdName
+                result['event'] = action.name.replace("Get","",1) 
+    
+        else:
+            result = xml.attrib.copy()
+            result['event'] = action.name.replace("Get","",1)
+   
+        for key in result:
+            result[key] = stringcase.snakecase(result[key])
+
+        return result
+
+
+    def session_start(self, event):
+        _LOGGER.debug("----------------- starting session ----------------")
+        _LOGGER.debug("event = {}".format(event))
+        #self.register_handler(Callback("general",
+        #                               MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}'),
+        #                               self._handle_ctl))
+        self.ready_flag.set()
+
+      
 
 class EcoVacsXMPP(ClientXMPP):
     def __init__(self, user, domain, resource, secret, continent, server_address=None):
@@ -528,6 +708,17 @@ class VacBotCommand:
             else:
                 ctl.set(key, value)
         return ctl
+
+    def args_to_xml(self):
+        ctl = ET.Element('ctl',{})
+        for key, value in self.args.items():
+            if type(value) is dict:
+                inner = ET.Element(key, value)
+                ctl.append(inner)
+            else:
+               ctl.set(key, value)
+        return ET.tostring(ctl).decode()
+
 
     def __str__(self, *args, **kwargs):
         return self.command_name() + " command"

@@ -209,17 +209,28 @@ def run(actions, debug):
     if actions:
         config = read_config()
         api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
-                         config['country'], config['continent'])
+                        config['country'], config['continent'])
         vacuum = api.devices()[0]
+       
         vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
-        vacbot.connect_and_wait_until_ready()
+                    #vacbot.connect_and_wait_until_ready()
+        
+        
+        
+        vacbot.request_all_statuses()
+       
+        print(vacbot.components)
+        print(vacbot.vacuum_status)
+        
+        print(vacbot)
+        
 
-        for action in actions:
-            click.echo("performing " + str(action.vac_command))
-            vacbot.run(action.vac_command)
-            action.wait.wait(vacbot)
+        #for action in actions:
+        #    click.echo("performing " + str(action.vac_command))
+        #    vacbot.run(action.vac_command)
+        #    action.wait.wait(vacbot)
 
-        vacbot.disconnect(wait=True)
+        #vacbot.disconnect(wait=True)
 
     click.echo("done")
 

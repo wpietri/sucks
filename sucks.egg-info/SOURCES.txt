@@ -1,0 +1,10 @@
+README.md
+setup.py
+sucks/__init__.py
+sucks/cli.py
+sucks.egg-info/PKG-INFO
+sucks.egg-info/SOURCES.txt
+sucks.egg-info/dependency_links.txt
+sucks.egg-info/entry_points.txt
+sucks.egg-info/requires.txt
+sucks.egg-info/top_level.txt

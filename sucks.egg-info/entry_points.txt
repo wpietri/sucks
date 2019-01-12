@@ -1,0 +1,3 @@
+[console_scripts]
+sucks = sucks.cli:cli
+
