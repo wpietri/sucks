@@ -19,8 +19,13 @@ _LOGGER = logging.getLogger(__name__)
 CLEAN_MODE_AUTO = 'auto'
 CLEAN_MODE_EDGE = 'edge'
 CLEAN_MODE_SPOT = 'spot'
+CLEAN_MODE_SPOT_AREA = 'spotarea'
 CLEAN_MODE_SINGLE_ROOM = 'single_room'
 CLEAN_MODE_STOP = 'stop'
+
+CLEAN_ACTION_START = 'start'
+CLEAN_ACTION_PAUSE = 'pause'
+CLEAN_ACTION_RESUME = 'resume'
 
 FAN_SPEED_NORMAL = 'normal'
 FAN_SPEED_HIGH = 'high'
@@ -36,7 +41,7 @@ COMPONENT_FILTER = 'filter'
 
 VACUUM_STATUS_OFFLINE = 'offline'
 
-CLEANING_STATES = {CLEAN_MODE_AUTO, CLEAN_MODE_EDGE, CLEAN_MODE_SPOT, CLEAN_MODE_SINGLE_ROOM}
+CLEANING_STATES = {CLEAN_MODE_AUTO, CLEAN_MODE_EDGE, CLEAN_MODE_SPOT, CLEAN_MODE_SPOT_AREA, CLEAN_MODE_SINGLE_ROOM}
 CHARGING_STATES = {CHARGE_MODE_CHARGING}
 
 # These dictionaries convert to and from Sucks's consts (which closely match what the UI and manuals use)
@@ -45,14 +50,22 @@ CLEAN_MODE_TO_ECOVACS = {
     CLEAN_MODE_AUTO: 'auto',
     CLEAN_MODE_EDGE: 'border',
     CLEAN_MODE_SPOT: 'spot',
+    CLEAN_MODE_SPOT_AREA: 'SpotArea',
     CLEAN_MODE_SINGLE_ROOM: 'singleroom',
     CLEAN_MODE_STOP: 'stop'
+}
+
+CLEAN_ACTION_TO_ECOVACS = {
+    CLEAN_ACTION_START: 's',
+    CLEAN_ACTION_PAUSE: 'p',
+    CLEAN_ACTION_RESUME: 'r',
 }
 
 CLEAN_MODE_FROM_ECOVACS = {
     'auto': CLEAN_MODE_AUTO,
     'border': CLEAN_MODE_EDGE,
     'spot': CLEAN_MODE_SPOT,
+    'SpotArea': CLEAN_MODE_SPOT_AREA,
     'singleroom': CLEAN_MODE_SINGLE_ROOM,
     'stop': CLEAN_MODE_STOP,
     'going': CHARGE_MODE_RETURNING
@@ -504,7 +517,8 @@ class VacBot():
             self.send_command(action.to_xml())
 
     def disconnect(self, wait=False):
-        self.xmpp.disconnect(wait=wait)
+        if not self.vacuum['iot']:
+            self.xmpp.disconnect(wait=wait)
 
 class EcoVacsIOT():
     def __init__(self, user, domain, resource, secret, continent, vacuum):
@@ -728,9 +742,9 @@ class VacBotCommand:
 
 
 class Clean(VacBotCommand):
-    def __init__(self, mode='auto', speed='normal', terminal=False):
-        super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
-
+    #def __init__(self, mode='auto', speed='normal', terminal=False): - Keeping original in case
+    def __init__(self, mode='auto', speed='normal', action='start', mid='',p='',deep='', terminal=False):
+        super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed], 'act': CLEAN_ACTION_TO_ECOVACS[action], 'mid':mid, 'p':p, 'deep':deep}})
 
 class Edge(Clean):
     def __init__(self):
@@ -746,6 +760,9 @@ class Stop(Clean):
     def __init__(self):
         super().__init__('stop', 'normal')
 
+class SpotArea(Clean):
+    def __init__(self):
+        super().__init__('spotarea', 'normal', 'start')
 
 class Charge(VacBotCommand):
     def __init__(self):

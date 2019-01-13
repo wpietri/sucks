@@ -213,24 +213,16 @@ def run(actions, debug):
         vacuum = api.devices()[0]
        
         vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
-                    #vacbot.connect_and_wait_until_ready()
+                    #vacbot.connect_and_wait_until_ready()(
         
-        
-        
-        vacbot.request_all_statuses()
-       
-        print(vacbot.components)
-        print(vacbot.vacuum_status)
-        
-        print(vacbot)
-        
+        vacbot.run(Clean('spotarea', 'normal', 'start', '2'))
 
-        #for action in actions:
+        # for action in actions:
         #    click.echo("performing " + str(action.vac_command))
         #    vacbot.run(action.vac_command)
         #    action.wait.wait(vacbot)
 
-        #vacbot.disconnect(wait=True)
+        vacbot.disconnect(wait=True)
 
     click.echo("done")
 
