@@ -403,6 +403,14 @@ class VacBot():
             _LOGGER.warning("Unknown cleaning status '" + type + "'")
         self.clean_status = type
         self.vacuum_status = type
+
+        if self.vacuum['iot']:
+            cleaning = event.get('st', None)
+            if cleaning == 'p':
+                self.clean_status = 'paused'
+            else:
+                self.clean_status = 'cleaning'
+        
         fan = event.get('speed', None)
         if fan is not None:
             try:
