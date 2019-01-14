@@ -215,9 +215,13 @@ def run(actions, debug):
         vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
                     #vacbot.connect_and_wait_until_ready()(
         
-        #vacbot.run(Clean('spotarea', 'normal', 'start', '2'))
-        vacbot.request_all_statuses()
-        
+        vacbot.run(Move('backward'))
+        vacbot.run(Move('backward'))
+        vacbot.run(Move('stop'))
+        #vacbot.run(Clean('spotarea', 'normal', 'start', '0'))
+     
+        #vacbot.request_all_statuses()
+
         # for action in actions:
         #    click.echo("performing " + str(action.vac_command))
         #    vacbot.run(action.vac_command)

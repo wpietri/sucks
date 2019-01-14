@@ -582,10 +582,11 @@ class EcoVacsIOT():
 
    
     def _handle_ctl(self, action, message):
-        resp = self._ctl_to_dict(action, message['resp'])
-        if resp is not None:
-            for s in self.ctl_subscribers:
-                s(resp)
+        if not message == {}:
+            resp = self._ctl_to_dict(action, message['resp'])
+            if resp is not None:
+                for s in self.ctl_subscribers:
+                    s(resp)
 
 
     def _ctl_to_dict(self, action, xmlstring):
@@ -709,6 +710,7 @@ class EcoVacsXMPP(ClientXMPP):
 class VacBotCommand:
     ACTION = {
         'forward': 'forward',
+        'backward': 'backward',
         'left': 'SpinLeft',
         'right': 'SpinRight',
         'turn_around': 'TurnAround',

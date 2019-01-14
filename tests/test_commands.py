@@ -103,6 +103,9 @@ def test_move_command():
     c = Move(action='forward')
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Move"><move action="forward" /></ctl>')
+    c = Move(action='backward')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl td="Move"><move action="backward" /></ctl>')
     c = Move(action='stop')
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Move"><move action="stop" /></ctl>')
