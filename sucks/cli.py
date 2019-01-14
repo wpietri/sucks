@@ -179,6 +179,12 @@ def edge(frequency, minutes):
         return CliAction(Edge(), wait=TimeWait(minutes * 60))
 
 
+@cli.command(help='spotcleans provided room(s) for the specified number of minutes')
+@click.argument('room', type=click.STRING)
+@click.argument('minutes', type=click.FLOAT)
+def spotclean(room, minutes):
+    return CliAction(SpotArea('start', room), wait=TimeWait(minutes * 60))
+
 @cli.command(help='returns to charger')
 def charge():
     return charge_action()
@@ -209,22 +215,15 @@ def run(actions, debug):
     if actions:
         config = read_config()
         api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
-                        config['country'], config['continent'])
+                         config['country'], config['continent'])
         vacuum = api.devices()[0]
-       
         vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
-                    #vacbot.connect_and_wait_until_ready()(
-        
-        
-        vacbot.run(SpotArea('start'))
-        
-     
-        #vacbot.request_all_statuses()
+        vacbot.connect_and_wait_until_ready()
 
-        # for action in actions:
-        #    click.echo("performing " + str(action.vac_command))
-        #    vacbot.run(action.vac_command)
-        #    action.wait.wait(vacbot)
+        for action in actions:
+            click.echo("performing " + str(action.vac_command))
+            vacbot.run(action.vac_command)
+            action.wait.wait(vacbot)
 
         vacbot.disconnect(wait=True)
 

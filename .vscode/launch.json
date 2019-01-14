@@ -18,8 +18,9 @@
             "program": "${workspaceFolder}/sucks/cli.py",
             "args" : [
                 "--debug",
-                "clean",
-                "10"
+                "spotclean",
+                "0",
+                "60"
             ],
             "console": "integratedTerminal"
         },

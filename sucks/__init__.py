@@ -360,11 +360,11 @@ class VacBot():
 
 
     def connect_and_wait_until_ready(self):
-        if self.vacuum['iot']:
-            self.iot.connect_and_wait_until_ready()
-            self.iot.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
+        if not self.vacuum['iot']:
+            #self.iot.connect_and_wait_until_ready()
+            #self.iot.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
 
-        else:
+        #else:
             self.xmpp.connect_and_wait_until_ready()
             self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
 
