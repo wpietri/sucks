@@ -216,7 +216,7 @@ def run(actions, debug):
                     #vacbot.connect_and_wait_until_ready()(
         
         
-        vacbot.run(SpotArea(action='start', mid='0'))
+        vacbot.run(SpotArea('start'))
         
      
         #vacbot.request_all_statuses()

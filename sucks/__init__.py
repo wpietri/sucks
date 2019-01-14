@@ -792,26 +792,16 @@ class Stop(Clean):
         super().__init__('stop', 'normal')
 
 class SpotArea(Clean):
-    def __init__(self, **kwargs):
-        self.action='start'
-        self.mid=''
-        self.p=''
-        self.deep=''
-        if kwargs is not None:
-            for kkey, kvalue in kwargs.items():
-                if kkey == 'action':
-                    self.action = kvalue
-                elif kkey == 'mid':
-                    self.mid = kvalue
-                elif kkey == 'p':
-                    self.p = kvalue
-                elif kkey == 'deep':
-                    self.deep = kvalue
+    def __init__(self, action='start', namedarea='', customarea='', cleanings='1'):
+        
        
-        if self.mid != '': #For cleaning specified map area
-            super().__init__('spotarea', 'normal', act=CLEAN_ACTION_TO_ECOVACS[self.action], mid=self.mid)
-        elif self.p != '': #For cleaning custom map area, and specify deep amount 1x/2x
-            super().__init__('spotarea' ,'normal',act=CLEAN_ACTION_TO_ECOVACS[self.action], p=self.p, deep=self.deep)
+        if namedarea != '': #For cleaning specified map area
+            super().__init__('spotarea', 'normal', act=CLEAN_ACTION_TO_ECOVACS[action], mid=namedarea)
+        elif customarea != '': #For cleaning custom map area, and specify deep amount 1x/2x
+            super().__init__('spotarea' ,'normal',act=CLEAN_ACTION_TO_ECOVACS[action], p=customarea, deep=cleanings)
+        else:
+            #no valid entries
+            raise ValueError("must provide namedarea or customarea for spotarea clean")
 
 class Charge(VacBotCommand):
     def __init__(self):

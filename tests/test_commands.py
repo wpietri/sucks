@@ -33,6 +33,42 @@ def test_clean_command():
     c = Clean('edge', 'high')
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Clean"><clean speed="strong" type="border" /></ctl>')  # protocol has attribs in other order
+    
+
+def test_spotarea_command():
+    assert_raises(ValueError, SpotArea, 'start') #Value error if SpotArea doesn't include a mid or p
+    
+    c = SpotArea('start', '0')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test namedarea clean
+
+    c = SpotArea('start', namedarea='0')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test namedarea keyword clean
+
+    c = SpotArea('start', '', '01234,56789')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" deep="1" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea clean
+
+    c = SpotArea('start', '', '01234,56789', '2')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" deep="2" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea clean with deep 2
+
+    c = SpotArea('start', '', customarea='01234,56789')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" deep="1" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea keyword clean with deep default
+
+    c = SpotArea('start', customarea='01234,56789', cleanings='2')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" deep="2" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea keyword and cleanings keyword clean with deep default
+
+    c = SpotArea('start', namedarea='0', customarea='01234,56789', cleanings='2')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test all keywords specified, should default to only mid
+
+    c = SpotArea('start', '0', '01234,56789','2')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test all keywords specified, should default to only mid
 
 
 def test_edge_command():
