@@ -353,7 +353,8 @@ class VacBot():
 
         if vacuum['iot']:
             self.iot = EcoVacsIOT(user, domain, resource, secret, continent, vacuum)
-            self.iot.subscribe_to_ctls(self._handle_ctl)
+            #TODO: How to handle subscriptions for IOT
+            #self.iot.subscribe_to_ctls(self._handle_ctl)
         else:
             self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, server_address)
             self.xmpp.subscribe_to_ctls(self._handle_ctl)
@@ -361,17 +362,21 @@ class VacBot():
 
     def connect_and_wait_until_ready(self):
         if not self.vacuum['iot']:
-            #self.iot.connect_and_wait_until_ready()
-            #self.iot.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
-
-        #else:
             self.xmpp.connect_and_wait_until_ready()
             self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
+        
+        #else: #ToDo identify the best way to handle similar for IOT devices
+            #self.iot.connect_and_wait_until_ready()
+            #self.iot.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
 
         if self._monitor:
             # Do a first ping, which will also fetch initial statuses if the ping succeeds
             self.send_ping()
-            self.xmpp.schedule('Components', 3600, lambda: self.refresh_components(), repeat=True)
+            if not self.vacuum['iot']:
+                self.xmpp.schedule('Components', 3600, lambda: self.refresh_components(), repeat=True)
+            else:
+                #For IOT go ahead and refresh components
+                self.refresh_components()
 
     def _handle_ctl(self, ctl):
         method = '_handle_' + ctl['event']
@@ -391,7 +396,6 @@ class VacBot():
             _LOGGER.warning("Unknown component type: '" + type + "'")
 
         if 'val' in event:
-
             lifespan = int(event['val']) / 100
         else:
             lifespan = int(event['left']) / 60  #This works for a D901
@@ -470,10 +474,7 @@ class VacBot():
         return self.vacuum_status in CLEANING_STATES
 
     def send_ping(self):
-        if self.vacuum['iot']:
-            #TODO
-            print("IOT Ping")
-        else:
+        if not self.vacuum['iot']:
             try:
                 self.xmpp.send_ping(self._vacuum_address())
             except XMPPError as err:
@@ -495,6 +496,8 @@ class VacBot():
                     if self.vacuum_status == 'offline':
                         self.vacuum_status = None
                         self.statusEvents.notify(self.vacuum_status)
+        #else: #TODO determine how to handle send_ping for IOT device
+            #print("IOT Ping")
 
     def refresh_components(self):
         try:
@@ -549,11 +552,11 @@ class EcoVacsIOT():
         self.ctl_subscribers = []
         self.ready_flag = Event()
                    
-
-    def connect_and_wait_until_ready(self):
-        self.connect(EcoVacsAPI._EcoVacsAPI__call_portal_api())
-        self.process()
-        self.wait_until_ready()
+    #TODO: Determine what to do with IOT connect and wait
+    # def connect_and_wait_until_ready(self):
+    #     self.connect(EcoVacsAPI._EcoVacsAPI__call_portal_api())
+    #     self.process()
+    #     self.wait_until_ready()
 
     def send_command(self, action, recipient):
         c = self._wrap_command(action, recipient)
@@ -562,7 +565,6 @@ class EcoVacsIOT():
         
 
     def _wrap_command(self, cmd, recipient):
-      
         return {
             'auth': {
                 'realm': EcoVacsAPI.REALM,
@@ -580,11 +582,9 @@ class EcoVacsIOT():
             "toType": self.vacuum['class']
         }     
 
-        
 
-
-    def subscribe_to_ctls(self, function):
-        self.ctl_subscribers.append(function)
+    # def subscribe_to_ctls(self, function):
+    #     self.ctl_subscribers.append(function)
 
    
     def _handle_ctl(self, action, message):
@@ -617,16 +617,6 @@ class EcoVacsIOT():
 
         return result
 
-
-    def session_start(self, event):
-        _LOGGER.debug("----------------- starting session ----------------")
-        _LOGGER.debug("event = {}".format(event))
-        #self.register_handler(Callback("general",
-        #                               MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}'),
-        #                               self._handle_ctl))
-        self.ready_flag.set()
-
-      
 
 class EcoVacsXMPP(ClientXMPP):
     def __init__(self, user, domain, resource, secret, continent, server_address=None):

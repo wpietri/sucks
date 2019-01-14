@@ -20,7 +20,7 @@
                 "--debug",
                 "spotclean",
                 "0",
-                "60"
+                "1"
             ],
             "console": "integratedTerminal"
         },
