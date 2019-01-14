@@ -9,4 +9,4 @@ dist
 # Nosetests files
 cover/
 .coverage
-.vscode/settings.json
+.vscode/
