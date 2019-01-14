@@ -270,18 +270,18 @@ def test_handle_unknown_ctl():
 # plus errors!
 
 def test_bot_address():
-    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "126", "nick": "bob"})
+    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot":False})
     assert_equals('E0000000001234567890@126.ecorobot.net/atom', v._vacuum_address())
 
 
 def test_model_variation():
-    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "141", "nick": "bob"})
+    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "141", "nick": "bob","iot":False})
     assert_equals('E0000000001234567890@141.ecorobot.net/atom', v._vacuum_address())
 
 
 
 def a_vacbot(bot=None, monitor=False):
     if bot is None:
-        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob"}
+        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": False}
     return VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
                   bot, 'na', monitor=monitor)

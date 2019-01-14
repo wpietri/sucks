@@ -51,6 +51,10 @@ def test_xml_to_dict():
         x._ctl_to_dict(make_ctl('# <ctl td="LifeSpan" type="Brush" val="099" total="365"/>')),
         {'event': 'life_span', 'type': 'brush', 'val': '099', 'total': '365'})
 
+    assert_dict_equal(
+        x._ctl_to_dict(make_ctl('<ctl td="LifeSpan" type="DustCaseHeap" val="-050" total="365"/>')),
+        {'event': 'life_span', 'type': 'dust_case_heap', 'val': '-050', 'total': '365'})
+
 
 def make_ecovacs_xmpp():
     return EcoVacsXMPP('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na')

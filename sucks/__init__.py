@@ -240,8 +240,10 @@ class EcoVacsAPI:
                                      'token': self.auth_code}
                                     )
 
-    def devices(self):
-        devices = self.__call_portal_api(self.USERSAPI,'GetDeviceList', {
+  
+
+    def getdevices(self):
+        return  self.__call_portal_api(self.USERSAPI,'GetDeviceList', {
             'userid': self.uid,
             'auth': {
                 'with': 'users',
@@ -252,7 +254,8 @@ class EcoVacsAPI:
             }
         })['devices']
 
-        iotProducts = self.__call_portal_api(self.PRODUCTAPI + '/getProductIotMap','', {
+    def getiotProducts(self):
+        return self.__call_portal_api(self.PRODUCTAPI + '/getProductIotMap','', {
             'channel': '',
             'auth': {
                 'with': 'users',
@@ -263,16 +266,18 @@ class EcoVacsAPI:
             }
         })['data']
 
+    def SetIOTDevices(self, devices, iotproducts):
         for device in devices: #Check if the device is part of iotProducts and add an iot flag. 
-            for iotProducts in iotProducts:
-                if device['class'] == iotProducts['classid']:
+            for iotProduct in iotproducts:
+                if device['class'] == iotProduct['classid']:
                     device['iot'] = True
                 else:
                     device['iot'] = False
-
         
         return devices
        
+    def devices(self):
+        return self.SetIOTDevices(self.getdevices(), self.getiotProducts())
 
     @staticmethod
     def md5(text):
@@ -386,11 +391,12 @@ class VacBot():
             _LOGGER.warning("Unknown component type: '" + type + "'")
 
         if 'val' in event:
+
             lifespan = int(event['val']) / 100
         else:
-            lifespan = int(event['left'].replace("_","-")) / 60  #This works for a D901, I also ran into a negative number and had to replace _ with -
+            lifespan = int(event['left']) / 60  #This works for a D901
         self.components[type] = lifespan
-        #lifespan = str(int(int(event['left']) / 60) + " (" + int(int(event['left'])/int(event['total'])*100) + "%)")  #This works for a D901
+        
         lifespan_event = {'type': type, 'lifespan': lifespan}
         self.lifespanEvents.notify(lifespan_event)
         _LOGGER.debug("*** life_span " + type + " = " + str(lifespan))
@@ -557,7 +563,7 @@ class EcoVacsIOT():
 
     def _wrap_command(self, cmd, recipient):
       
-        q = {
+        return {
             'auth': {
                 'realm': EcoVacsAPI.REALM,
                 'resource': self.resource,
@@ -574,7 +580,7 @@ class EcoVacsIOT():
             "toType": self.vacuum['class']
         }     
 
-        return q
+        
 
 
     def subscribe_to_ctls(self, function):
@@ -671,8 +677,17 @@ class EcoVacsXMPP(ClientXMPP):
             result.update(xml[0].attrib)
 
         for key in result:
-            result[key] = stringcase.snakecase(result[key])
+            if not self.RepresentsInt(result[key]): #Fix to handle negative int values
+                result[key] = stringcase.snakecase(result[key])
+            
         return result
+
+    def RepresentsInt(self, stringvar):
+        try: 
+            int(stringvar)
+            return True
+        except ValueError:
+            return False
 
     def register_callback(self, kind, function):
         self.register_handler(Callback(kind,
@@ -717,7 +732,7 @@ class VacBotCommand:
         'stop': 'stop'
     }
 
-    def __init__(self, name, args=None):
+    def __init__(self, name, args=None, **kwargs):
         if args is None:
             args = {}
         self.name = name
@@ -753,8 +768,14 @@ class VacBotCommand:
 
 class Clean(VacBotCommand):
     #def __init__(self, mode='auto', speed='normal', terminal=False): - Keeping original in case
-    def __init__(self, mode='auto', speed='normal', action='start', mid='',p='',deep='', terminal=False):
-        super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed], 'act': CLEAN_ACTION_TO_ECOVACS[action], 'mid':mid, 'p':p, 'deep':deep}})
+    def __init__(self, mode='auto', speed='normal', terminal=False, **kwargs):
+        if kwargs is None:
+            super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
+        else:
+            initcmd = {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}
+            for kkey, kvalue in kwargs.items():
+                initcmd[kkey] = kvalue
+            super().__init__('Clean', {'clean': initcmd})
 
 class Edge(Clean):
     def __init__(self):
@@ -771,8 +792,26 @@ class Stop(Clean):
         super().__init__('stop', 'normal')
 
 class SpotArea(Clean):
-    def __init__(self):
-        super().__init__('spotarea', 'normal', 'start')
+    def __init__(self, **kwargs):
+        self.action='start'
+        self.mid=''
+        self.p=''
+        self.deep=''
+        if kwargs is not None:
+            for kkey, kvalue in kwargs.items():
+                if kkey == 'action':
+                    self.action = kvalue
+                elif kkey == 'mid':
+                    self.mid = kvalue
+                elif kkey == 'p':
+                    self.p = kvalue
+                elif kkey == 'deep':
+                    self.deep = kvalue
+       
+        if self.mid != '': #For cleaning specified map area
+            super().__init__('spotarea', 'normal', act=CLEAN_ACTION_TO_ECOVACS[self.action], mid=self.mid)
+        elif self.p != '': #For cleaning custom map area, and specify deep amount 1x/2x
+            super().__init__('spotarea' ,'normal',act=CLEAN_ACTION_TO_ECOVACS[self.action], p=self.p, deep=self.deep)
 
 class Charge(VacBotCommand):
     def __init__(self):
