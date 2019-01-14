@@ -9,4 +9,6 @@ dist
 # Nosetests files
 cover/
 .coverage
+
+# Ignore Vscode files
 .vscode/
