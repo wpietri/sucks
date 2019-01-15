@@ -278,13 +278,13 @@ class EcoVacsAPI:
         })['data']
 
     def SetIOTDevices(self, devices, iotproducts):
-        for device in devices: #Check if the device is part of iotProducts and add an iot flag. 
+        for device in devices: #Check if the device is part of iotProducts
             for iotProduct in iotproducts:
-                if device['class'] == iotProduct['classid']:
-                    device['iot'] = True
-                else:
+                if not device['class'] == iotProduct['classid']:
                     device['iot'] = False
-        
+                else:
+                    device['iot'] = True #If it is add an iot flag. 
+                    
         return devices
        
     def devices(self):
@@ -371,22 +371,17 @@ class VacBot():
 
 
     def connect_and_wait_until_ready(self):
-        #if not self.vacuum['iot']:
         self.xmpp.connect_and_wait_until_ready()
         self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
         
-        #else: #ToDo identify the best way to handle similar for IOT devices
+        #ToDo identify the best way to handle similar for IOT devices
             #self.iot.connect_and_wait_until_ready()
             #self.iot.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
 
         if self._monitor:
             # Do a first ping, which will also fetch initial statuses if the ping succeeds
             self.send_ping()
-            #if not self.vacuum['iot']:
             self.xmpp.schedule('Components', 3600, lambda: self.refresh_components(), repeat=True)
-           #else:
-                #For IOT go ahead and refresh components
-            #    self.refresh_components()
 
     def _handle_ctl(self, ctl):
         method = '_handle_' + ctl['event']
@@ -424,7 +419,7 @@ class VacBot():
         self.clean_status = type
         self.vacuum_status = type
 
-        if self.vacuum['iot']:
+        if self.vacuum['iot']: #Was able to parse additional status from the IOT, may apply to XMPP too
             cleaning = event.get('st', None)
             if cleaning == 'p':
                 self.clean_status = 'paused'
@@ -456,7 +451,14 @@ class VacBot():
             _LOGGER.debug("*** battery_status = {:.0%}".format(self.battery_status))
 
     def _handle_charge_state(self, event):
-        status = event['type']
+        if 'type' in event:
+            status = event['type']
+        elif 'errno' in event: #Handle error
+            if event['ret'] == 'fail' and event['errno'] == '8': #Already charging
+                status = 'slot_charging'
+            else: 
+                _LOGGER.error("Unknown charging status '" + event['errno'] + "'") #Log this so we can identify more errors    
+        
         try:
             status = CHARGE_MODE_FROM_ECOVACS[status]
         except KeyError:
@@ -511,6 +513,9 @@ class VacBot():
                     self.vacuum_status = None
                     self.statusEvents.notify(self.vacuum_status)
 
+            if self.vacuum['iot']: #If an IOT device request statuses, to update events
+                self.refresh_statuses()
+
     def refresh_components(self):
         try:
             self.run(GetLifeSpan('main_brush'))
@@ -521,7 +526,7 @@ class VacBot():
             _LOGGER.debug("*** Error type: " + err.etype)
             _LOGGER.debug("*** Error condition: " + err.condition)
 
-    def request_all_statuses(self):
+    def refresh_statuses(self):
         try:
             self.run(GetCleanState())
             self.run(GetChargeState())
@@ -530,24 +535,22 @@ class VacBot():
             _LOGGER.warning("Initial status requests failed to reach VacBot. Will try again on next ping.")
             _LOGGER.debug("*** Error type: " + err.etype)
             _LOGGER.debug("*** Error condition: " + err.condition)
-        else:
-            self.refresh_components()
+
+    def request_all_statuses(self):
+        self.refresh_statuses()
+        self.refresh_components()
 
     def send_command(self, action):
-        if self.vacuum['iot']:
-            self.iot.send_command(action, self._vacuum_address())
+        if not self.vacuum['iot']:
+            self.xmpp.send_command(action.to_xml(), self._vacuum_address()) 
         else:
-            self.xmpp.send_command(action, self._vacuum_address())
-
+            self.iot.send_command(action, self._vacuum_address())  #IOT devices need the full action for additional parsing
+            
     def run(self, action):
-        if self.vacuum['iot']:
-            self.send_command(action)
-        else:
-            self.send_command(action.to_xml())
+        self.send_command(action) 
 
     def disconnect(self, wait=False):
-        if not self.vacuum['iot']:
-            self.xmpp.disconnect(wait=wait)
+        self.xmpp.disconnect(wait=wait)
 
 #This is used by EcoVacsIOT and EcoVacsXMPP for _ctl_to_dict
 def RepresentsInt(stringvar):
@@ -613,7 +616,7 @@ class EcoVacsIOT():
             if resp is not None:
                 for s in self.ctl_subscribers:
                     s(resp)
-
+                
 
     def _ctl_to_dict(self, action, xmlstring):
         xml = ET.fromstring(xmlstring)
@@ -624,13 +627,21 @@ class EcoVacsIOT():
             #Fix for difference in XMPP vs IOT response
             #Depending on the report will use the tag and add "report" to fit the mold of sucks library
             if xmlchild[0].tag == "clean":
-                result['event'] = xmlchild[0].tag + "_report"
+                result['event'] = "CleanReport"
+            elif xmlchild[0].tag == "charge":
+                result['event'] = "ChargeState"
+            elif xmlchild[0].tag == "battery":
+                result['event'] = "BatteryInfo"
             else: #Default back to replacing Get from the api cmdName
                 result['event'] = action.name.replace("Get","",1) 
     
         else:
             result = xml.attrib.copy()
             result['event'] = action.name.replace("Get","",1)
+            if 'ret' in result: #Handle errors as needed
+                if result['ret'] == 'fail':
+                    if action.name == "Charge": #So far only seen this with Charge, when already docked
+                        result['event'] = "ChargeState"
    
         for key in result:
             if not RepresentsInt(result[key]): #Fix to handle negative int values
@@ -646,7 +657,6 @@ class EcoVacsXMPP(ClientXMPP):
         self.user = user
         self.domain = domain
         self.resource = resource
-        self.apiresource = resource
         self.continent = continent
         self.vacuum = vacuum
         self.credentials['authzid'] = user
@@ -717,7 +727,7 @@ class EcoVacsXMPP(ClientXMPP):
         if not self.vacuum['iot']:
             return self.user + '@' + self.domain + '/' + self.boundjid.resource
         else:
-            return self.user + '@' + self.domain + '/' + self.apiresource
+            return self.user + '@' + self.domain + '/' + self.resource
 
 
     def send_ping(self, to):

@@ -43,6 +43,9 @@ def test_handle_charge_state():
     v._handle_ctl({'event': 'charge_state', 'type': 'idle'})
     assert_equals('idle', v.charge_status)
 
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '8'}) #Seen in IOT when already charging
+    assert_equals('charging', v.charge_status)
+
     v._handle_ctl({'event': 'charge_state', 'type': 'a_type_not_supported_by_sucks'})
     assert_equals('a_type_not_supported_by_sucks', v.charge_status)
 
