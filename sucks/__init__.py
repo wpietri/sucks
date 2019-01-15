@@ -209,8 +209,18 @@ class EcoVacsAPI:
             params = {}
             params.update(args)
 
+
         url = (EcoVacsAPI.PORTAL_URL_FORMAT + "/" + api).format(continent=self.continent, **self.meta)
-        response = requests.post(url, json=params)
+        response = None
+        if not api == self.IOTDEVMANAGERAPI:
+            response = requests.post(url, json=params)
+        else:
+            try: #IOT Device sometimes doesnt provide a response depending on command, reduce timeout to 1.25 to accomodate and make requests faster
+                response = requests.post(url, json=params, timeout=1.25) #May think about having timeout as an arg that could be provided in the future
+            except requests.exceptions.ReadTimeout:
+                _LOGGER.debug("call to {} failed with ReadTimeout".format(function))
+                return {}                
+
         json = response.json()
         _LOGGER.debug("got {}".format(json))
         if api == self.USERSAPI:    
