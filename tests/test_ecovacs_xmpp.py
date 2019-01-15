@@ -56,8 +56,10 @@ def test_xml_to_dict():
         {'event': 'life_span', 'type': 'dust_case_heap', 'val': '-050', 'total': '365'})
 
 
-def make_ecovacs_xmpp():
-    return EcoVacsXMPP('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na')
+def make_ecovacs_xmpp(bot=None):
+    if bot is None:
+        bot = bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": False}
+    return EcoVacsXMPP('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na', bot)
 
 
 def make_ctl(string):
