@@ -219,6 +219,10 @@ def run(actions, debug):
         vacuum = api.devices()[0]
         vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
         vacbot.connect_and_wait_until_ready()
+        time.sleep(3)
+        vacbot.run(Move('backward'))
+        time.sleep(3)
+        vacbot.run(Charge())
 
         for action in actions:
             click.echo("performing " + str(action.vac_command))
