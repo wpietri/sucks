@@ -223,8 +223,8 @@ class EcoVacsAPI:
         if not api == self.IOTDEVMANAGERAPI:
             response = requests.post(url, json=params)
         else:
-            try: #IOT Device sometimes doesnt provide a response depending on command, reduce timeout to 1.25 to accomodate and make requests faster
-                response = requests.post(url, json=params, timeout=1.25) #May think about having timeout as an arg that could be provided in the future
+            try: #IOT Device sometimes doesnt provide a response depending on command, reduce timeout to 3 to accomodate and make requests faster
+                response = requests.post(url, json=params, timeout=3) #May think about having timeout as an arg that could be provided in the future
             except requests.exceptions.ReadTimeout:
                 _LOGGER.debug("call to {} failed with ReadTimeout".format(function))
                 return {}                
@@ -298,10 +298,8 @@ class EcoVacsAPI:
     def SetIOTDevices(self, devices, iotproducts):
         for device in devices: #Check if the device is part of iotProducts
             for iotProduct in iotproducts:
-                if not device['class'] == iotProduct['classid']:
-                    device['iot'] = False
-                else:
-                    device['iot'] = True #If it is add an iot flag. 
+                if device['class'] in iotProduct['classid']:
+                    device['iot'] = True
                     
         return devices
        
@@ -589,7 +587,8 @@ class VacBot():
             self.iot.send_command(action, self._vacuum_address())  #IOT devices need the full action for additional parsing
             
     def run(self, action):
-        self.send_command(action) 
+            self.send_command(action) 
+
 
     def disconnect(self, wait=False):        
         if not self.vacuum['iot']:
@@ -628,6 +627,8 @@ class EcoVacsIOT():
     #     self.wait_until_ready()
 
     def send_command(self, action, recipient):
+        if action.name == "Clean": #For handling Clean when action not specified (i.e. CLI)
+            action.args['clean']['act'] = CLEAN_ACTION_TO_ECOVACS['start'] #Inject a start action
         c = self._wrap_command(action, recipient)
         _LOGGER.debug('Sending command {0}'.format(c))
         self._handle_ctl(action, self.api._EcoVacsAPI__call_portal_api(self.api, self.api.IOTDEVMANAGERAPI,'',c  ))
@@ -726,7 +727,7 @@ class EcoVacsMQTT(ClientMQTT):
 
         self.ready_flag = Event()
 
-    def _disconnect():
+    def _disconnect(self):
         self.disconnect() #disconnect mqtt connection
         self.scheduler.empty() #Clear schedule queue  
 
@@ -998,9 +999,12 @@ class VacBotCommand:
 
 
 class Clean(VacBotCommand):
-    def __init__(self, mode='auto', speed='normal', terminal=False, **kwargs):
+    def __init__(self, mode='auto', speed='normal', iot=False, action='start',terminal=False, **kwargs):
         if kwargs is None:
-            super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
+            if not iot:
+                super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
+            else:
+                super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed],'act': CLEAN_ACTION_TO_ECOVACS[action]}})
         else:
             initcmd = {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}
             for kkey, kvalue in kwargs.items():
