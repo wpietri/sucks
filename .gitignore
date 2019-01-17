@@ -15,3 +15,5 @@ cover/
 
 # Ignore sucks.egg-info
 sucks.egg-info/
+.noseids
+nosetests.xml

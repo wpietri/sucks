@@ -379,6 +379,11 @@ class VacBot():
         self.lifespanEvents = EventEmitter()
         self.errorEvents = EventEmitter()
 
+        #Set none for clients to start
+        self.mqtt = None
+        self.iot = None
+        self.xmpp = None
+
         if vacuum['iot']:
             self.iot = EcoVacsIOT(user, domain, resource, secret, continent, vacuum)            
             self.iot.subscribe_to_ctls(self._handle_ctl)
@@ -481,6 +486,7 @@ class VacBot():
             if event['ret'] == 'fail' and event['errno'] == '8': #Already charging
                 status = 'slot_charging'
             else: 
+                status = 'idle' #Fall back to Idle status
                 _LOGGER.error("Unknown charging status '" + event['errno'] + "'") #Log this so we can identify more errors    
         
         try:
@@ -515,6 +521,14 @@ class VacBot():
         try:
             if not self.vacuum['iot']:
                 self.xmpp.send_ping(self._vacuum_address()) 
+            elif self.vacuum['iot']:
+                if not self.mqtt.send_ping():   
+                    raise RuntimeError()
+                                    
+            #self.xmpp.send_ping(EcoVacsAPI.REALM) #IOT vacuums are using the realm instead
+            #Some devices may utilize this, but it appears to 
+            # just be an oversight in the app communidcations.  IOT should probably be using MQTT pings (which are automatic when connected)
+    
            
         except XMPPError as err:
             _LOGGER.warning("Ping did not reach VacBot. Will retry.")
@@ -525,21 +539,12 @@ class VacBot():
                 self.vacuum_status = 'offline'
                 self.statusEvents.notify(self.vacuum_status)
 
-        try:
-            if self.vacuum['iot']:
-                self.mqtt.send_ping()
-                #self.xmpp.send_ping(EcoVacsAPI.REALM) #IOT vacuums are using the realm instead
-                #Some devices may utilize this, but it appears to 
-                # just be an oversight in the app communidcations.  IOT should probably be using MQTT pings (which are automatic when connected)
-        
-        except MQTTException as err:
+        except RuntimeError as err:
             _LOGGER.warning("Ping did not reach VacBot. Will retry.")
-            _LOGGER.debug("*** Error type: " + err.etype)
-            _LOGGER.debug("*** Error condition: " + err.condition)
             self._failed_pings += 1
             if self._failed_pings >= 4:
                 self.vacuum_status = 'offline'
-                self.statusEvents.notify(self.vacuum_status)
+                self.statusEvents.notify(self.vacuum_status)  
           
         else:
             self._failed_pings = 0
@@ -806,9 +811,14 @@ class EcoVacsMQTT(ClientMQTT):
         _LOGGER.debug("*** MQTT sending ping ***")
         rc = self._send_simple_command(MQTTPublish.paho.PINGREQ)
         if rc == MQTTPublish.paho.MQTT_ERR_SUCCESS:
-            _LOGGER.debug("*** MQTT ping acknowledged ***")
-        
-        return rc
+            _LOGGER.debug("*** MQTT ping acknowledged ***")   
+            print(rc)
+            return True         
+        else:
+            print(rc)
+            return False
+       
+
 
     def connect_and_wait_until_ready(self):
         
