@@ -56,6 +56,7 @@ the XMPP/device server.
 
 There are a few different endpoints within the API that have been seen and are used in the library:
 
+
 | Endpoint                      | Description                               |
 | ----------------------------- | ----------------------------------------- |
 | /users/user.do                | Handles user / account functions          |
@@ -87,6 +88,7 @@ getProductIotMap - Provides a list of "IOT" products, the devices are referenced
 
 
 At this point depending on your device you will connect to either an XMPP server, or an MQTT server.  This is believed to be based on the "IOT Products" vs "Non-IOT" products. 
+
 | "Non-IOT" Products                                                                | "IOT" Products                                                                                                                                                        |
 |----------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Connect to an XMPP server to send commands to devices and receive status results | Connect to an MQTT server to subscribe to status messages and results.  A Rest API is utilized to send commands to devices, but can also be used to obtain statuses. |
@@ -140,19 +142,19 @@ Commands are sent via POST in the format of:
 ```json
 {
     "auth": {
-    "realm": EcoVacsAPI.REALM,
-    "resource": self.resource,
-    "token": self.secret,
-    "userid": self.uid,
+    "realm": "ecouser.net",
+    "resource": "resource",
+    "token": "token",
+    "userid": "userid",
     "with": "users",
 },
-"cmdName": cmd.name,
-"payload": cmd.args_to_xml(),            
+"cmdName": "cmd.name",
+"payload": "cmd.args",            
 "payloadType": "x",
 "td": "q",
-"toId": recipient,
-"toRes": self.vacuum['resource'],
-"toType": self.vacuum['class']
+"toId": "vacuum.serial",
+"toRes": "vacuum.resource",
+"toType": "vacuum.class"
 }   
 ```
 
@@ -259,8 +261,9 @@ HostHang, then proceeds to stop and broadcasts 100 NoError.
 
 
 **Known error codes**
+
 |Code|Description|
-|-|-|
+|-----|-----|
 |100|NoError: Robot is operational|
 |101|BatteryLow: Low battery|
 |102|HostHang: Robot is stuck|
@@ -276,7 +279,7 @@ Different sid "Sound IDs" will play different sounds.  If the vacuum has Voice R
     
 `<ctl td="PlaySound" sid="1" />`
 
-| SID |  Description                                               |
+|SID |Description                                               |
 |-----|------------------------------------------------------------|
 | 0   | Startup Music Chime                                        |
 | 3   | I Am Suspended                                             |
