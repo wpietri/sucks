@@ -583,7 +583,8 @@ class VacBot():
     def send_command(self, action):
         if not self.vacuum['iot']:
             self.xmpp.send_command(action.to_xml(), self._vacuum_address()) 
-        else:            
+        else:   
+            #IOT issues commands via restAPI, and listens on MQTT for status updates         
             self.iot.send_command(action, self._vacuum_address())  #IOT devices need the full action for additional parsing
             
     def run(self, action):
@@ -772,7 +773,7 @@ class EcoVacsMQTT(ClientMQTT):
 
     def _ctl_to_dict(self, topic, xmlstring):
         #I haven't seen the need to fall back to data within the topic (like we do with IOT rest call actions), but it is here in case of future need
-        xml = ET.fromstring(xmlstring) #Convert from string to xm (like IOT rest calls), other than this it is similar to XMPP
+        xml = ET.fromstring(xmlstring) #Convert from string to xml (like IOT rest calls), other than this it is similar to XMPP
         
         #Including changes from jasonarends @ 28da7c2 below
         result = xml.attrib.copy()
@@ -813,10 +814,8 @@ class EcoVacsMQTT(ClientMQTT):
         rc = self._send_simple_command(MQTTPublish.paho.PINGREQ)
         if rc == MQTTPublish.paho.MQTT_ERR_SUCCESS:
             _LOGGER.debug("*** MQTT ping acknowledged ***")   
-            print(rc)
             return True         
         else:
-            print(rc)
             return False
        
 
