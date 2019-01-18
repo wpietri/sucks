@@ -4,6 +4,8 @@ from sucks import *
 
 from unittest.mock import Mock
 from sleekxmpp.exceptions import XMPPError
+from paho.mqtt.client import MQTT_ERR_UNKNOWN as MQTTError
+
 
 
 def test_handle_clean_report():
@@ -45,6 +47,9 @@ def test_handle_charge_state():
 
     v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '8'}) #Seen in IOT when already charging
     assert_equals('charging', v.charge_status)
+
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '5'}) #Seen in IOT randomly - not sure what this is yet
+    assert_equals('idle', v.charge_status)
 
     v._handle_ctl({'event': 'charge_state', 'type': 'a_type_not_supported_by_sucks'})
     assert_equals('a_type_not_supported_by_sucks', v.charge_status)
@@ -135,8 +140,8 @@ def test_is_charging():
     assert_false(v.is_charging)
 
 def test_send_ping_no_monitor():
+    #Test XMPP Ping
     v = a_vacbot()
-
     mock = v.xmpp.send_ping = Mock()
     v.send_ping()
 
@@ -154,8 +159,28 @@ def test_send_ping_no_monitor():
     v.send_ping()
     assert_equals(None, v.vacuum_status)
 
+    #Test MQTT Ping
+    v = a_vacbot(iot=True)
+    mock = v.mqtt.send_ping = Mock()
+    v.send_ping()
+
+    # On four failed pings, vacuum state gets set to 'offline'
+    mock.return_value = False
+    v.send_ping()
+    v.send_ping()
+    v.send_ping()
+    assert_equals(None, v.vacuum_status)
+    v.send_ping()
+    assert_equals('offline', v.vacuum_status)
+
+    # On a successful ping after the offline state, state gets reset to None, indicating that it is unknown
+    mock.return_value = True
+    v.send_ping()
+    assert_equals(None, v.vacuum_status)
+
 
 def test_send_ping_with_monitor():
+    #Test XMPP Ping
     v = a_vacbot(monitor=True)
 
     ping_mock = v.xmpp.send_ping = Mock()
@@ -178,6 +203,33 @@ def test_send_ping_with_monitor():
 
     # On a successful ping after the offline state, a request for initial statuses is made
     ping_mock.side_effect = None
+    request_statuses_mock.reset_mock()
+    v.send_ping()
+    assert_equals(1, request_statuses_mock.call_count)
+
+    #Test MQTT Ping
+    v = a_vacbot(iot=True, monitor=True)
+
+    ping_mock = v.mqtt.send_ping = Mock()
+    request_statuses_mock = v.request_all_statuses = Mock()
+
+    # First ping should try to fetch statuses
+    v.send_ping()
+    assert_equals(1, request_statuses_mock.call_count)
+
+    # Nothing blowing up is success
+
+    # On four failed pings, vacuum state gets set to 'offline'
+    ping_mock.return_value = False
+    v.send_ping()
+    v.send_ping()
+    v.send_ping()
+    assert_equals(None, v.vacuum_status)
+    v.send_ping()
+    assert_equals('offline', v.vacuum_status)
+
+    # On a successful ping after the offline state, a request for initial statuses is made
+    ping_mock.return_value = True
     request_statuses_mock.reset_mock()
     v.send_ping()
     assert_equals(1, request_statuses_mock.call_count)
@@ -283,8 +335,8 @@ def test_model_variation():
 
 
 
-def a_vacbot(bot=None, monitor=False):
+def a_vacbot(bot=None, iot=False, monitor=False):
     if bot is None:
-        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": False}
+        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": iot}
     return VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
                   bot, 'na', monitor=monitor)

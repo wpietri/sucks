@@ -4,12 +4,20 @@ import time
 from base64 import b64decode, b64encode
 from collections import OrderedDict
 from threading import Event
+import threading
+import sched
 
 import requests
 import stringcase
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
 from sleekxmpp.exceptions import XMPPError
+
+from paho.mqtt.client import Client  as ClientMQTT
+from paho.mqtt import publish as MQTTPublish
+from paho.mqtt import subscribe as MQTTSubscribe
+
+import ssl
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -215,8 +223,8 @@ class EcoVacsAPI:
         if not api == self.IOTDEVMANAGERAPI:
             response = requests.post(url, json=params)
         else:
-            try: #IOT Device sometimes doesnt provide a response depending on command, reduce timeout to 1.25 to accomodate and make requests faster
-                response = requests.post(url, json=params, timeout=1.25) #May think about having timeout as an arg that could be provided in the future
+            try: #IOT Device sometimes doesnt provide a response depending on command, reduce timeout to 3 to accomodate and make requests faster
+                response = requests.post(url, json=params, timeout=3) #May think about having timeout as an arg that could be provided in the future
             except requests.exceptions.ReadTimeout:
                 _LOGGER.debug("call to {} failed with ReadTimeout".format(function))
                 return {}                
@@ -290,10 +298,8 @@ class EcoVacsAPI:
     def SetIOTDevices(self, devices, iotproducts):
         for device in devices: #Check if the device is part of iotProducts
             for iotProduct in iotproducts:
-                if not device['class'] == iotProduct['classid']:
-                    device['iot'] = False
-                else:
-                    device['iot'] = True #If it is add an iot flag. 
+                if device['class'] in iotProduct['classid']:
+                    device['iot'] = True
                     
         return devices
        
@@ -341,7 +347,6 @@ class EventListener(object):
     def unsubscribe(self):
         self._emitter.unsubscribe(self)
 
-
 class VacBot():
     def __init__(self, user, domain, resource, secret, vacuum, continent, server_address=None, monitor=False):
 
@@ -372,26 +377,38 @@ class VacBot():
         self.lifespanEvents = EventEmitter()
         self.errorEvents = EventEmitter()
 
+        #Set none for clients to start
+        self.mqtt = None
+        self.iot = None
+        self.xmpp = None
+
         if vacuum['iot']:
             self.iot = EcoVacsIOT(user, domain, resource, secret, continent, vacuum)            
             self.iot.subscribe_to_ctls(self._handle_ctl)
+            self.mqtt = EcoVacsMQTT(user, domain, resource, secret, continent, vacuum)            
+            self.mqtt.subscribe_to_ctls(self._handle_ctl)
         
-        self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address )
-        self.xmpp.subscribe_to_ctls(self._handle_ctl)
+        else:
+            self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address )
+            self.xmpp.subscribe_to_ctls(self._handle_ctl)
 
 
     def connect_and_wait_until_ready(self):
-        self.xmpp.connect_and_wait_until_ready()
-        self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
-        
-        #ToDo identify the best way to handle similar for IOT devices
-            #self.iot.connect_and_wait_until_ready()
-            #self.iot.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
+        if not self.vacuum['iot']:
+            self.xmpp.connect_and_wait_until_ready()
+            self.xmpp.schedule('Ping', 30, lambda: self.send_ping(), repeat=True)
+        else:
+            self.mqtt.connect_and_wait_until_ready()
+            self.mqtt.schedule(30, self.send_ping)
 
         if self._monitor:
             # Do a first ping, which will also fetch initial statuses if the ping succeeds
             self.send_ping()
-            self.xmpp.schedule('Components', 3600, lambda: self.refresh_components(), repeat=True)
+            if not self.vacuum['iot']:            
+                self.xmpp.schedule('Components', 3600, lambda: self.refresh_components(), repeat=True)
+            else:
+                self.mqtt.schedule(3600,self.refresh_components)
+
 
     def _handle_ctl(self, ctl):
         method = '_handle_' + ctl['event']
@@ -467,6 +484,7 @@ class VacBot():
             if event['ret'] == 'fail' and event['errno'] == '8': #Already charging
                 status = 'slot_charging'
             else: 
+                status = 'idle' #Fall back to Idle status
                 _LOGGER.error("Unknown charging status '" + event['errno'] + "'") #Log this so we can identify more errors    
         
         try:
@@ -500,9 +518,16 @@ class VacBot():
     def send_ping(self):
         try:
             if not self.vacuum['iot']:
-                self.xmpp.send_ping(self._vacuum_address())
-            else:
-                self.xmpp.send_ping(EcoVacsAPI.REALM) #IOT vacuums are using the realm instead
+                self.xmpp.send_ping(self._vacuum_address()) 
+            elif self.vacuum['iot']:
+                if not self.mqtt.send_ping():   
+                    raise RuntimeError()
+                                    
+            #self.xmpp.send_ping(EcoVacsAPI.REALM) #IOT vacuums are using the realm instead
+            #Some devices may utilize this, but it appears to 
+            # just be an oversight in the app communidcations.  IOT should probably be using MQTT pings (which are automatic when connected)
+    
+           
         except XMPPError as err:
             _LOGGER.warning("Ping did not reach VacBot. Will retry.")
             _LOGGER.debug("*** Error type: " + err.etype)
@@ -511,6 +536,14 @@ class VacBot():
             if self._failed_pings >= 4:
                 self.vacuum_status = 'offline'
                 self.statusEvents.notify(self.vacuum_status)
+
+        except RuntimeError as err:
+            _LOGGER.warning("Ping did not reach VacBot. Will retry.")
+            self._failed_pings += 1
+            if self._failed_pings >= 4:
+                self.vacuum_status = 'offline'
+                self.statusEvents.notify(self.vacuum_status)  
+          
         else:
             self._failed_pings = 0
             if self._monitor:
@@ -522,9 +555,6 @@ class VacBot():
                 if self.vacuum_status == 'offline':
                     self.vacuum_status = None
                     self.statusEvents.notify(self.vacuum_status)
-
-            if self.vacuum['iot']: #If an IOT device request statuses, to update events
-                self.refresh_statuses()
 
     def refresh_components(self):
         try:
@@ -553,16 +583,23 @@ class VacBot():
     def send_command(self, action):
         if not self.vacuum['iot']:
             self.xmpp.send_command(action.to_xml(), self._vacuum_address()) 
-        else:
+        else:   
+            #IOT issues commands via restAPI, and listens on MQTT for status updates         
             self.iot.send_command(action, self._vacuum_address())  #IOT devices need the full action for additional parsing
             
     def run(self, action):
-        self.send_command(action) 
+            self.send_command(action) 
 
-    def disconnect(self, wait=False):
-        self.xmpp.disconnect(wait=wait)
 
-#This is used by EcoVacsIOT and EcoVacsXMPP for _ctl_to_dict
+    def disconnect(self, wait=False):        
+        if not self.vacuum['iot']:
+            self.xmpp.disconnect(wait=wait)
+        else:
+            self.mqtt._disconnect()
+        
+            
+
+#This is used by EcoVacsIOT, EcoVacsXMPP, and EcoVacsMQTT for _ctl_to_dict
 def RepresentsInt(stringvar):
     try: 
         int(stringvar)
@@ -581,7 +618,6 @@ class EcoVacsIOT():
         self.api = EcoVacsAPI
         self.api.continent = continent
         self.api.meta = {}
-        #self.add_event_handler("session_start", self.session_start)
         self.ctl_subscribers = []
         self.ready_flag = Event()
                    
@@ -592,6 +628,8 @@ class EcoVacsIOT():
     #     self.wait_until_ready()
 
     def send_command(self, action, recipient):
+        if action.name == "Clean": #For handling Clean when action not specified (i.e. CLI)
+            action.args['clean']['act'] = CLEAN_ACTION_TO_ECOVACS['start'] #Inject a start action
         c = self._wrap_command(action, recipient)
         _LOGGER.debug('Sending command {0}'.format(c))
         self._handle_ctl(action, self.api._EcoVacsAPI__call_portal_api(self.api, self.api.IOTDEVMANAGERAPI,'',c  ))
@@ -659,6 +697,169 @@ class EcoVacsIOT():
 
         return result
 
+class EcoVacsMQTT(ClientMQTT):
+    def __init__(self, user, domain, resource, secret, continent, vacuum, server_address=None ):
+        ClientMQTT.__init__(self)
+
+        self.ctl_subscribers = []        
+        self.user = user
+        self.domain = str(domain).split(".")[0] #MQTT is using domain without tld extension
+        self.resource = resource
+        self.continent = continent
+        self.vacuum = vacuum
+        self.scheduler = sched.scheduler(time.time, time.sleep)
+        self.scheduler_thread = threading.Thread(target=self.scheduler.run, daemon=True, name="mqtt_schedule_thread")
+
+        
+        if server_address is None:            
+            self.hostname = ('mq-{}.ecouser.net'.format(self.continent))
+            self.port = 8883
+        else:
+            saddress = server_address.split(":")
+            if len(saddress) > 1:
+                self.hostname = saddress[0]
+                if RepresentsInt(saddress[1]):
+                    self.port = int(saddress[1])
+                else:
+                    self.port = 8883                    
+
+        self._client_id = self.user + '@' + self.domain.split(".")[0] + '/' + self.resource        
+        self.username_pw_set(self.user + '@' + self.domain, secret)
+
+        self.ready_flag = Event()
+
+    def _disconnect(self):
+        self.disconnect() #disconnect mqtt connection
+        self.scheduler.empty() #Clear schedule queue  
+
+    def _run_scheduled_func(self, timer_seconds, timer_function):
+        timer_function()
+        self.schedule(timer_seconds, timer_function)
+
+    def schedule(self, timer_seconds, timer_function):
+        self.scheduler.enter(timer_seconds, 1, self._run_scheduled_func,(timer_seconds, timer_function))
+        if not self.scheduler_thread.isAlive():
+            self.scheduler_thread.start()
+        
+    def wait_until_ready(self):
+        self.ready_flag.wait()
+
+    def on_connect(self, client, userdata, flags, rc):        
+        if rc != 0:
+            _LOGGER.error("EcoVacsMQTT - error connecting with MQTT Return {}".format(rc))
+            raise RuntimeError("EcoVacsMQTT - error connecting with MQTT Return {}".format(rc))
+                 
+        else:
+            _LOGGER.debug("EcoVacsMQTT - Connected with result code "+str(rc))
+            _LOGGER.debug("EcoVacsMQTT - Subscribing to all")        
+
+            self.subscribe('iot/atr/+/' + self.vacuum['did'] + '/' + self.vacuum['class'] + '/' + self.vacuum['resource'] + '/+', qos=0)
+                        
+            self.ready_flag.set()
+
+    #def on_log(self, client, userdata, level, buf): #This is very noisy and verbose
+    #    _LOGGER.debug("EcoVacsMQTT Log: {} ".format(buf))
+
+    def subscribe_to_ctls(self, function):
+        self.ctl_subscribers.append(function)
+
+    def _handle_ctl(self, client, userdata, message):
+        _LOGGER.debug("EcoVacs MQTT Received Message on Topic: {} - Message: {}".format(message.topic, str(message.payload.decode("utf-8"))))
+        as_dict = self._ctl_to_dict(message.topic, str(message.payload.decode("utf-8")))
+        if as_dict is not None:
+            for s in self.ctl_subscribers:
+                s(as_dict)
+                
+
+    def _ctl_to_dict(self, topic, xmlstring):
+        #I haven't seen the need to fall back to data within the topic (like we do with IOT rest call actions), but it is here in case of future need
+        xml = ET.fromstring(xmlstring) #Convert from string to xml (like IOT rest calls), other than this it is similar to XMPP
+        
+        #Including changes from jasonarends @ 28da7c2 below
+        result = xml.attrib.copy()
+        if 'td' not in result:
+            # This happens for commands with no response data, such as PlaySound
+            # Handle response data with no 'td'
+
+            if 'type' in result: # single element with type and val
+                result['event'] = "LifeSpan" # seems to always be LifeSpan type
+
+            else:
+                if len(xml) > 0: # case where there is child element
+                    if 'clean' in xml[0].tag:
+                        result['event'] = "CleanReport"
+                    elif 'charge' in xml[0].tag:
+                        result['event'] = "ChargeState"
+                    elif 'battery' in xml[0].tag:
+                        result['event'] = "BatteryInfo"
+                    else:
+                        return
+                    result.update(xml[0].attrib)
+                else: # for non-'type' result with no child element, e.g., result of PlaySound
+                    return
+        else: # response includes 'td'
+            result['event'] = result.pop('td')
+            if xml:
+                result.update(xml[0].attrib)         
+   
+        for key in result:
+            if not RepresentsInt(result[key]): #Fix to handle negative int values
+                result[key] = stringcase.snakecase(result[key])
+
+        return result
+
+
+    def send_ping(self):
+        _LOGGER.debug("*** MQTT sending ping ***")
+        rc = self._send_simple_command(MQTTPublish.paho.PINGREQ)
+        if rc == MQTTPublish.paho.MQTT_ERR_SUCCESS:
+            _LOGGER.debug("*** MQTT ping acknowledged ***")   
+            return True         
+        else:
+            return False
+       
+
+
+    def connect_and_wait_until_ready(self):
+        
+        #self._on_log = self.on_log #This provides more logging than needed, even for debug
+        self._on_message = self._handle_ctl
+        self._on_connect = self.on_connect        
+
+        #TODO: This is pretty insecure and accepts any cert, maybe actually check?
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+        self.tls_set_context(ssl_ctx)
+        self.tls_insecure_set(True)
+        
+        self.connect(self.hostname, self.port)
+        self.loop_start()        
+        self.wait_until_ready()
+
+
+    # def send_command(self, xml, recipient): #MQTT doesn't seem to care about commands we send today, but leaving in case of futures
+    #     #c = self._wrap_command(xml, recipient)
+    #     #_LOGGER.debug('Sending command {0}'.format(c))
+    #     txml = '"<ctl td="Move"><move action="backward" /></ctl>'
+    #     _LOGGER.debug('Sending command {0}'.format(txml))
+    #     self.publish('iot/atr/Move/' + self.vacuum['did'] + '/' + self.vacuum['class'] + '/' + self.vacuum['resource'] + '/x', txml)
+    #     #<ctl td="Move"><move action="backward" /></ctl>
+
+    # def _wrap_command(self, ctl, recipient):
+    #     q = self.make_iq_query(xmlns=u'com:ctl', ito=recipient, ifrom=self._my_address())
+    #     q['type'] = 'set'
+    #     for child in q.xml:
+    #         if child.tag.endswith('query'):
+    #             child.append(ctl)
+    #             return q
+
+    # def _my_address(self):
+    #     if not self.vacuum['iot']:
+    #     return self.user + '@' + self.domain + '/' + self.boundjid.resource
+    # else:
+    #     return self.user + '@' + self.domain + '/' + self.resource
+
 
 class EcoVacsXMPP(ClientXMPP):
     def __init__(self, user, domain, resource, secret, continent, vacuum, server_address=None ):
@@ -715,7 +916,8 @@ class EcoVacsXMPP(ClientXMPP):
             
         return result
 
-    def register_callback(self, kind, function):
+    def register_callback(self, userdata, message):
+
         self.register_handler(Callback(kind,
                                        MatchXPath('{jabber:client}iq/{com:ctl}query/{com:ctl}ctl[@td="' + kind + '"]'),
                                        function))
@@ -796,9 +998,12 @@ class VacBotCommand:
 
 
 class Clean(VacBotCommand):
-    def __init__(self, mode='auto', speed='normal', terminal=False, **kwargs):
+    def __init__(self, mode='auto', speed='normal', iot=False, action='start',terminal=False, **kwargs):
         if kwargs is None:
-            super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
+            if not iot:
+                super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
+            else:
+                super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed],'act': CLEAN_ACTION_TO_ECOVACS[action]}})
         else:
             initcmd = {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}
             for kkey, kvalue in kwargs.items():
