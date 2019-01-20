@@ -45,10 +45,16 @@ def test_handle_charge_state():
     v._handle_ctl({'event': 'charge_state', 'type': 'idle'})
     assert_equals('idle', v.charge_status)
 
-    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '8'}) #Seen in IOT when already charging
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '9'}) #Seen in IOT - "but on charger, but turned off"
+    assert_equals('idle', v.charge_status)
+
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '8'}) #Seen in IOT - could be "already charging"
     assert_equals('charging', v.charge_status)
 
-    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '5'}) #Seen in IOT randomly - not sure what this is yet
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '5'}) #Seen in IOT - could be "busy with another command"
+    assert_equals('idle', v.charge_status)
+
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '3'}) #Seen in IOT - could be "Bot in stuck state, example dust bin out"
     assert_equals('idle', v.charge_status)
 
     v._handle_ctl({'event': 'charge_state', 'type': 'a_type_not_supported_by_sucks'})
@@ -86,6 +92,14 @@ def test_handle_battery_info():
 
     v._handle_ctl({'event': 'battery_info', 'power': '000'})
     assert_equals(0.0, v.battery_status)
+
+
+def test_handle_geterrors():
+    v = a_vacbot()
+    
+    #v._handle_error
+
+    #ssert_equals({}, v.components)
 
 def test_lifespan_reports():
     v = a_vacbot()
@@ -138,6 +152,9 @@ def test_is_charging():
 
     v._handle_ctl({'event': 'clean_report', 'type': 'edge', 'speed': 'normal'})
     assert_false(v.is_charging)
+
+
+
 
 def test_send_ping_no_monitor():
     #Test XMPP Ping

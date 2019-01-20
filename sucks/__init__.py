@@ -416,9 +416,14 @@ class VacBot():
             getattr(self, method)(ctl)
 
     def _handle_error(self, event):
-        error = event['error']
-        self.errorEvents.notify(error)
-        _LOGGER.debug("*** error = " + error)
+        if 'error' in event:
+            error = event['error']
+        elif 'errs' in event:
+            error = event['errs']
+
+        if not error == '':
+            self.errorEvents.notify(error)
+            _LOGGER.debug("*** error = " + error)
 
     def _handle_life_span(self, event):
         type = event['type']
@@ -483,6 +488,10 @@ class VacBot():
         elif 'errno' in event: #Handle error
             if event['ret'] == 'fail' and event['errno'] == '8': #Already charging
                 status = 'slot_charging'
+            elif event['ret'] == 'fail' and event['errno'] == '5': #Busy with another command
+                status = 'idle'
+            elif event['ret'] == 'fail' and event['errno'] == '3': #Bot in stuck state, example dust bin out
+                status = 'idle'
             else: 
                 status = 'idle' #Fall back to Idle status
                 _LOGGER.error("Unknown charging status '" + event['errno'] + "'") #Log this so we can identify more errors    
@@ -632,7 +641,9 @@ class EcoVacsIOT():
             action.args['clean']['act'] = CLEAN_ACTION_TO_ECOVACS['start'] #Inject a start action
         c = self._wrap_command(action, recipient)
         _LOGGER.debug('Sending command {0}'.format(c))
-        self._handle_ctl(action, self.api._EcoVacsAPI__call_portal_api(self.api, self.api.IOTDEVMANAGERAPI,'',c  ))
+        self._handle_ctl(action, 
+            self.api._EcoVacsAPI__call_portal_api(self.api, self.api.IOTDEVMANAGERAPI,'',c  )
+            )
         
 
     def _wrap_command(self, cmd, recipient):

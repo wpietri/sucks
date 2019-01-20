@@ -1,14 +1,20 @@
 from re import compile
 
 import requests_mock
+import requests
 from nose.tools import *
 
 from sucks import *
-from test_ecovacs_api import make_api
+from tests.test_ecovacs_api import make_api
 
 
 # There are few tests for the IOT stuff here because it's relatively complicated to test given
 # the library's design and its multithreaded nature and lack of explicit testing support.
+
+
+def test_is_iot():
+    x = make_ecovacs_iot()
+    assert_equal(x.vacuum['iot'], True)
 
 def test_wrap_command():
     x = make_ecovacs_iot()
@@ -18,52 +24,81 @@ def test_wrap_command():
     assert_equal(c['toId'], 'E0000000001234567890')
     assert_equal(c['payload'], '<ctl><charge type="go" /></ctl>')
 
-def test_is_iot():
+def test_iotapi_response():
     x = make_ecovacs_iot()
-
-# TODO - Error response from command
-#'cmdName': 'Charge', 'payload': '<ctl><charge type="go" /></ctl>', 'payloadType': 'x', 'td': 'q', 'toId': '0e084f6c-0846-4342-a947-fe14c293301f', 'toRes': 'wC3g', 'toType': 'ls1ok3'}
-# - Already charging on dock
-#{'ret': 'ok', 'resp': "<ctl ret='fail' errno='8'/>", 'id': 'NLQy'}
-
-#Timeout
-# {'ret': 'fail', 'errno': 500, 'debug': 'wait for response timed out'}
-
-# def test_subscribe_to_ctls():
-#     response = None
-
-#     def save_response(value):
-#         nonlocal response
-#         response = value
-
-#     x = make_ecovacs_iot()
-
-#     query = x.make_iq_query()
-#     query.set_payload(
-#         ET.fromstring('<query xmlns="com:ctl"><ctl td="CleanReport"> <clean type="auto" /> </ctl></query>'))
-
-#     x.subscribe_to_ctls(save_response)
-#     x._handle_ctl(query)
-#     assert_dict_equal(response, {'event': 'clean_report', 'type': 'auto'})
+    api = make_api()
+    x.api = api
+    
+    with requests_mock.mock() as m:
+        
+        #Test GetCleanState        
+        resp = {"ret":"ok","resp":"<ctl ret='ok'><clean type='auto' speed='standard' st='h' t='1159' a='15' s='0' tr=''/></ctl>","id":"Qgxa"}
+        r1 = m.post(compile('iot/devmanager.do'),
+            json=resp)
+        cmd = VacBotCommand("GetCleanState")
+        c = x._wrap_command(cmd, x.vacuum['did'])
+        rtnval = api._EcoVacsAPI__call_portal_api(api.IOTDEVMANAGERAPI, '', c)        
+        assert_equal(rtnval, {'ret':'ok','resp':"<ctl ret='ok'><clean type='auto' speed='standard' st='h' t='1159' a='15' s='0' tr=''/></ctl>",'id':'Qgxa'})
+                            
+        #Test Timeout                
+        r2 = m.post(compile('iot/devmanager.do'),exc=requests.exceptions.ReadTimeout)      
+        cmd = VacBotCommand("GetCleanState")
+        c = x._wrap_command(cmd, x.vacuum['did'])
+        rtnval = api._EcoVacsAPI__call_portal_api(api.IOTDEVMANAGERAPI, '', c)        
+        assert_equal(rtnval, {}) #Right now it sends back a blank object
 
 
-# def test_xml_to_dict():
-#     x = make_ecovacs_iot()
+def test_subscribe_to_ctls():
+    response = None
 
-#     assert_dict_equal(
-#         x._ctl_to_dict(make_ctl('<ctl td="CleanReport"> <clean type="auto" /> </ctl>')),
-#         {'event': 'clean_report', 'type': 'auto'})
-#     assert_dict_equal(
-#         x._ctl_to_dict(make_ctl('<ctl td="CleanReport"> <clean type="auto" speed="strong" /> </ctl>')),
-#         {'event': 'clean_report', 'type': 'auto', 'speed': 'strong'})
+    def save_response(value):
+        nonlocal response
+        response = value
 
-#     assert_dict_equal(
-#         x._ctl_to_dict(make_ctl('<ctl td="BatteryInfo"><battery power="095"/></ctl>')),
-#         {'event': 'battery_info', 'power': '095'})
+    x = make_ecovacs_iot()
+    
+    x.subscribe_to_ctls(save_response)
+    message = {}
+    message['resp'] = '<ctl td="CleanReport"> <clean type="auto" /> </ctl>'
+    
+    x.subscribe_to_ctls(save_response)
+    x._handle_ctl("Clean", message)
+    assert_dict_equal(response, {'event': 'clean_report', 'type': 'auto'})
 
-#     assert_dict_equal(
-#         x._ctl_to_dict(make_ctl('# <ctl td="LifeSpan" type="Brush" val="099" total="365"/>')),
-#         {'event': 'life_span', 'type': 'brush', 'val': '099', 'total': '365'})
+
+def test_xml_to_dict():
+    x = make_ecovacs_iot()
+    message = {}
+
+    cmd = VacBotCommand("Clean")
+    message['resp'] = "<ctl ret='ok'><clean type='auto' speed='standard' st='h' t='1159' a='15' s='0' tr=''/></ctl>"
+    assert_dict_equal(
+        x._ctl_to_dict(cmd,message['resp']),
+        {'event': 'clean_report', 'type': 'auto', 'speed': 'standard', 'st':'h','t':'1159','a':'15','s':'0','tr':''})
+    
+    cmd = VacBotCommand("Clean")
+    message['resp'] = "<ctl ret='ok'><clean type='auto' speed='strong' st='h' t='1159' a='15' s='0' tr=''/></ctl>"
+    assert_dict_equal(
+        x._ctl_to_dict(cmd,message['resp']),
+        {'event': 'clean_report', 'type': 'auto', 'speed': 'strong', 'st':'h','t':'1159','a':'15','s':'0','tr':''})
+
+    cmd = VacBotCommand("GetBatteryInfo")
+    message['resp'] = "<ctl ret='ok'><battery power='82'/></ctl>"
+    assert_dict_equal(
+        x._ctl_to_dict(cmd,message['resp']),
+        {'event': 'battery_info', 'power': '82'})
+
+    cmd = VacBotCommand("GetLifeSpan")
+    message['resp'] = "<ctl ret='ok' type='Brush' left='9876' total='18000'/>"
+    assert_dict_equal(
+        x._ctl_to_dict(cmd,message['resp']),
+        {'event': 'life_span','ret':'ok', 'type': 'brush', 'left': '9876', 'total': '18000'})
+
+    cmd = VacBotCommand("Charge")
+    message['resp'] = "<ctl ret='fail' errno='8'/>"
+    assert_dict_equal(
+        x._ctl_to_dict(cmd,message['resp']),
+        {'event': 'charge_state','ret':'fail', 'errno': '8'}) #Test fail from charge command
 
 
 def make_ecovacs_iot():
