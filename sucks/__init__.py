@@ -814,7 +814,9 @@ class EcoVacsMQTT(ClientMQTT):
                 result.update(xml[0].attrib)         
    
         for key in result:
-            if not RepresentsInt(result[key]): #Fix to handle negative int values
+            if ',' in result[key]: #Seen in position updates
+                print(result[key])
+            elif not RepresentsInt(result[key]): #Fix to handle negative int values
                 result[key] = stringcase.snakecase(result[key])
 
         return result

@@ -116,6 +116,3 @@ def make_ecovacs_iot():
     eiotvacuum = d[0]
     eiotvacuum['resource'] = device_resource
     return EcoVacsIOT('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'base64base64base64base64base64ba', 'na', eiotvacuum)
-
-def make_ctl(string):
-    return ET.fromstring('<query xmlns="com:ctl">' + string + '</query>')[0]
