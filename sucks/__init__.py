@@ -181,7 +181,8 @@ class EcoVacsAPI:
         params = OrderedDict(args)
         params['requestId'] = self.md5(time.time())
         url = (EcoVacsAPI.MAIN_URL_FORMAT + "/" + function).format(**self.meta)
-        api_response = requests.get(url, self.__sign(params))
+        #Ignore SSL
+        api_response = requests.get(url, self.__sign(params), verify=False)
         json = api_response.json()
         _LOGGER.debug("got {}".format(json))
         if json['code'] == '0000':
@@ -198,7 +199,8 @@ class EcoVacsAPI:
         _LOGGER.debug("calling user api {} with {}".format(function, args))
         params = {'todo': function}
         params.update(args)
-        response = requests.post(EcoVacsAPI.USER_URL_FORMAT.format(continent=self.continent), json=params)
+        #Ignore SSL
+        response = requests.post(EcoVacsAPI.USER_URL_FORMAT.format(continent=self.continent), json=params, verify=False)
         json = response.json()
         _LOGGER.debug("got {}".format(json))
         if json['result'] == 'ok':
@@ -221,10 +223,12 @@ class EcoVacsAPI:
         url = (EcoVacsAPI.PORTAL_URL_FORMAT + "/" + api).format(continent=self.continent, **self.meta)
         response = None
         if not api == self.IOTDEVMANAGERAPI:
-            response = requests.post(url, json=params)
+            #Ignore SSL
+            response = requests.post(url, json=params, verify=False)
         else:
             try: #IOT Device sometimes doesnt provide a response depending on command, reduce timeout to 3 to accomodate and make requests faster
-                response = requests.post(url, json=params, timeout=3) #May think about having timeout as an arg that could be provided in the future
+                #Ignore SSL
+                response = requests.post(url, json=params, timeout=3, verify=False) #May think about having timeout as an arg that could be provided in the future
             except requests.exceptions.ReadTimeout:
                 _LOGGER.debug("call to {} failed with ReadTimeout".format(function))
                 return {}                
@@ -764,8 +768,7 @@ class EcoVacsMQTT(ClientMQTT):
             _LOGGER.debug("EcoVacsMQTT - Connected with result code "+str(rc))
             _LOGGER.debug("EcoVacsMQTT - Subscribing to all")        
 
-            self.subscribe('iot/atr/+/' + self.vacuum['did'] + '/' + self.vacuum['class'] + '/' + self.vacuum['resource'] + '/+', qos=0)
-                        
+            self.subscribe('iot/atr/+/' + self.vacuum['did'] + '/' + self.vacuum['class'] + '/' + self.vacuum['resource'] + '/+', qos=0)            
             self.ready_flag.set()
 
     #def on_log(self, client, userdata, level, buf): #This is very noisy and verbose
