@@ -114,6 +114,14 @@ COMPONENT_FROM_ECOVACS = {
     'dust_case_heap': COMPONENT_FILTER
 }
 
+def str_to_bool(s):
+    if s == 'True':
+        return True
+    elif s == 'False':
+        return False
+    else:
+        raise ValueError("Cannot covert {} to a bool".format(s))
+
 class EcoVacsAPI:
     CLIENT_KEY = "eJUWrzRv34qFSaYk"
     SECRET = "Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GC"
@@ -129,7 +137,7 @@ class EcoVacsAPI:
       
     REALM = 'ecouser.net'
 
-    def __init__(self, device_id, account_id, password_hash, country, continent):
+    def __init__(self, device_id, account_id, password_hash, country, continent, verify_ssl=True):
         self.meta = {
             'country': country,
             'lang': 'en',
@@ -143,6 +151,8 @@ class EcoVacsAPI:
             'deviceType': '1'
             #'deviceType': '2' - iphone
         }
+        
+        self.verify_ssl = str_to_bool(verify_ssl)
         _LOGGER.debug("Setting up EcoVacsAPI")
         self.resource = device_id[0:8]
         self.country = country
@@ -181,8 +191,7 @@ class EcoVacsAPI:
         params = OrderedDict(args)
         params['requestId'] = self.md5(time.time())
         url = (EcoVacsAPI.MAIN_URL_FORMAT + "/" + function).format(**self.meta)
-        #Ignore SSL
-        api_response = requests.get(url, self.__sign(params), verify=False)
+        api_response = requests.get(url, self.__sign(params), verify=self.verify_ssl)
         json = api_response.json()
         _LOGGER.debug("got {}".format(json))
         if json['code'] == '0000':
@@ -199,8 +208,7 @@ class EcoVacsAPI:
         _LOGGER.debug("calling user api {} with {}".format(function, args))
         params = {'todo': function}
         params.update(args)
-        #Ignore SSL
-        response = requests.post(EcoVacsAPI.USER_URL_FORMAT.format(continent=self.continent), json=params, verify=False)
+        response = requests.post(EcoVacsAPI.USER_URL_FORMAT.format(continent=self.continent), json=params, verify=self.verify_ssl)
         json = response.json()
         _LOGGER.debug("got {}".format(json))
         if json['result'] == 'ok':
@@ -210,7 +218,7 @@ class EcoVacsAPI:
             raise RuntimeError(
                 "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], function, params))
 
-    def __call_portal_api(self, api, function, args):
+    def __call_portal_api(self, api, function, args, verify_ssl=True):
         _LOGGER.debug("calling portal api {} function {} with {}".format(api, function, args))
         if api == self.USERSAPI:
             params = {'todo': function}
@@ -223,12 +231,10 @@ class EcoVacsAPI:
         url = (EcoVacsAPI.PORTAL_URL_FORMAT + "/" + api).format(continent=self.continent, **self.meta)
         response = None
         if not api == self.IOTDEVMANAGERAPI:
-            #Ignore SSL
-            response = requests.post(url, json=params, verify=False)
+            response = requests.post(url, json=params, verify=verify_ssl)
         else:
             try: #IOT Device sometimes doesnt provide a response depending on command, reduce timeout to 3 to accomodate and make requests faster
-                #Ignore SSL
-                response = requests.post(url, json=params, timeout=3, verify=False) #May think about having timeout as an arg that could be provided in the future
+                response = requests.post(url, json=params, timeout=3, verify=verify_ssl) #May think about having timeout as an arg that could be provided in the future
             except requests.exceptions.ReadTimeout:
                 _LOGGER.debug("call to {} failed with ReadTimeout".format(function))
                 return {}                
@@ -271,7 +277,7 @@ class EcoVacsAPI:
                                      'realm': EcoVacsAPI.REALM,
                                      'userId': self.uid,
                                      'token': self.auth_code}
-                                    )
+                                    , verify_ssl=self.verify_ssl)
 
   
 
@@ -285,7 +291,7 @@ class EcoVacsAPI:
                 'token': self.user_access_token,
                 'resource': self.resource
             }
-        })['devices']
+        }, verify_ssl=self.verify_ssl)['devices']
 
     def getiotProducts(self):
         return self.__call_portal_api(self.PRODUCTAPI + '/getProductIotMap','', {
@@ -297,7 +303,7 @@ class EcoVacsAPI:
                 'token': self.user_access_token,
                 'resource': self.resource
             }
-        })['data']
+        }, verify_ssl=self.verify_ssl)['data']
 
     def SetIOTDevices(self, devices, iotproducts):
         for device in devices: #Check if the device is part of iotProducts
@@ -352,7 +358,7 @@ class EventListener(object):
         self._emitter.unsubscribe(self)
 
 class VacBot():
-    def __init__(self, user, domain, resource, secret, vacuum, continent, server_address=None, monitor=False):
+    def __init__(self, user, domain, resource, secret, vacuum, continent, server_address=None, monitor=False, verify_ssl=True):
 
         self.vacuum = vacuum
 
@@ -387,13 +393,16 @@ class VacBot():
         self.xmpp = None
 
         if vacuum['iot']:
-            self.iot = EcoVacsIOT(user, domain, resource, secret, continent, vacuum)            
+            self.iot = EcoVacsIOT(user, domain, resource, secret, continent, vacuum, verify_ssl=verify_ssl)            
             self.iot.subscribe_to_ctls(self._handle_ctl)
-            self.mqtt = EcoVacsMQTT(user, domain, resource, secret, continent, vacuum)            
+            self.mqtt = EcoVacsMQTT(user, domain, resource, secret, continent, vacuum, server_address)            
             self.mqtt.subscribe_to_ctls(self._handle_ctl)
+            self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address)
+            self.xmpp.subscribe_to_ctls(self._handle_ctl)
+
         
         else:
-            self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address )
+            self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address)
             self.xmpp.subscribe_to_ctls(self._handle_ctl)
 
 
@@ -621,7 +630,7 @@ def RepresentsInt(stringvar):
         return False
 
 class EcoVacsIOT():
-    def __init__(self, user, domain, resource, secret, continent, vacuum):
+    def __init__(self, user, domain, resource, secret, continent, vacuum, verify_ssl=True):
         self.uid = user
         self.domain = domain
         self.resource = resource
@@ -633,6 +642,7 @@ class EcoVacsIOT():
         self.api.meta = {}
         self.ctl_subscribers = []
         self.ready_flag = Event()
+        self.verify_ssl = str_to_bool(verify_ssl)
                    
     #TODO: Determine what to do with IOT connect and wait, or scrap
     # def connect_and_wait_until_ready(self):
@@ -646,7 +656,7 @@ class EcoVacsIOT():
         c = self._wrap_command(action, recipient)
         _LOGGER.debug('Sending command {0}'.format(c))
         self._handle_ctl(action, 
-            self.api._EcoVacsAPI__call_portal_api(self.api, self.api.IOTDEVMANAGERAPI,'',c  )
+            self.api._EcoVacsAPI__call_portal_api(self.api, self.api.IOTDEVMANAGERAPI,'',c ,verify_ssl=self.verify_ssl )
             )
         
 

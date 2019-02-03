@@ -215,9 +215,9 @@ def run(actions, debug):
     if actions:
         config = read_config()
         api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
-                         config['country'], config['continent'])
+                         config['country'], config['continent'], verify_ssl=config['verify_ssl'])
         vacuum = api.devices()[0]
-        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
+        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'], verify_ssl=config['verify_ssl'])
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:
