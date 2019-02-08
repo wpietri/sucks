@@ -19,6 +19,20 @@ def test_custom_command_inner_tag():
                   b'<ctl td="CustomCommand"><customtag customvar="customvalue" /></ctl>')
 
 
+def test_custom_command_multiple_inner_tag():
+    # Ensure a custom-built command with multiple inner tags generates the expected XML payload
+    c = VacBotCommand('CustomCommand', {"customtag":[{"customvar":"customvalue1"},{"customvar":"customvalue2"}]})
+    logging.info(ElementTree.tostring(c.to_xml()))
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl td="CustomCommand"><customtag customvar="customvalue1" /><customtag customvar="customvalue2" /></ctl>')
+
+def test_custom_command_args_multiple_inner_tag():
+    # Ensure a custom-built command with args and multiple inner tags generates the expected XML payload
+    c = VacBotCommand('CustomCommand', {"arg1":"value1","customtag":[{"customvar":"customvalue1"},{"customvar":"customvalue2"}]})
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl arg1="value1" td="CustomCommand"><customtag customvar="customvalue1" /><customtag customvar="customvalue2" /></ctl>')
+
+
 def test_custom_command_noargs():
     # Ensure a custom-built command with no args generates XML without an args element
     c = VacBotCommand('CustomCommand')

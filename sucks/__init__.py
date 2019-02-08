@@ -115,10 +115,10 @@ COMPONENT_FROM_ECOVACS = {
 }
 
 def str_to_bool(s):
-    if s == 'True':
+    if s == 'True' or s == True:
         return True
-    elif s == 'False':
-        return False
+    elif s == 'False' or s == False:
+        return False    
     else:
         raise ValueError("Cannot covert {} to a bool".format(s))
 
@@ -661,6 +661,10 @@ class EcoVacsIOT():
         
 
     def _wrap_command(self, cmd, recipient):
+        #Remove the td from ctl xml for RestAPI
+        payloadxml = cmd.to_xml()
+        payloadxml.attrib.pop("td")
+          
         return {
             'auth': {
                 'realm': EcoVacsAPI.REALM,
@@ -669,8 +673,9 @@ class EcoVacsIOT():
                 'userid': self.uid,
                 'with': 'users',
             },
-            "cmdName": cmd.name,
-            "payload": cmd.args_to_xml(),            
+            "cmdName": cmd.name,            
+            "payload": ET.tostring(payloadxml).decode(),  
+                      
             "payloadType": "x",
             "td": "q",
             "toId": recipient,
@@ -997,24 +1002,18 @@ class VacBotCommand:
 
     def to_xml(self):
         ctl = ET.Element('ctl', {'td': self.name})
-        for key, value in self.args.items():
+        for key, value in self.args.items():        
             if type(value) is dict:
                 inner = ET.Element(key, value)
                 ctl.append(inner)
+            elif type(value) is list:
+                for item in value:
+                    ixml = self.listobject_to_xml(key, item)
+                    ctl.append(ixml)
             else:
                 ctl.set(key, value)
+
         return ctl
-
-    def args_to_xml(self):
-        ctl = ET.Element('ctl',{})
-        for key, value in self.args.items():
-            if type(value) is dict:
-                inner = ET.Element(key, value)
-                ctl.append(inner)
-            else:
-               ctl.set(key, value)
-        return ET.tostring(ctl).decode()
-
 
     def __str__(self, *args, **kwargs):
         return self.command_name() + " command"
@@ -1022,6 +1021,14 @@ class VacBotCommand:
     def command_name(self):
         return self.__class__.__name__.lower()
 
+    def listobject_to_xml(self, tag, conv_object):
+        rtnobject = ET.Element(tag) 
+        if type(conv_object) is dict:
+            for key, value in conv_object.items():
+                rtnobject.set(key, value)
+        else:
+            rtnobject.set(tag, conv_object)
+        return rtnobject
 
 class Clean(VacBotCommand):
     def __init__(self, mode='auto', speed='normal', iot=False, action='start',terminal=False, **kwargs):
