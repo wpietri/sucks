@@ -71,15 +71,24 @@ def test_xml_to_dict():
         x._ctl_to_dict(test_topic, "<ctl ts='1547823592934' td='MapSt' st='relocGoChgStart' method='' info=''/>"),
         {'event': 'map_st', 'ts':'1547823592934', 'st':'reloc_go_chg_start', 'method':'', 'info':''})
 
+   
     # #TODO: Find a way to check if string is b64 encoded
     # test_topic = 'iot/atr/trace/%s/%s/%s/x'.format(x.vacuum['did'], x.vacuum['class'], x.vacuum['resource'])
     # assert_dict_equal(       
     #     x._ctl_to_dict(test_topic, "<ctl td='trace' trid='227975' tf='3' tt='4' tr='XQAABAAKAAAAAB4AMGAQCdAAAAA='/>"),
     #     {'event': 'trace', 'trid':'227975', 'tf':'4', 'tr':'XQAABAAKAAAAAB4AMGAQCdAAAAA='})
 
+def test_bad_port():
+    bot = {"did": "E0000000001234567890", "class": "126","resource":"test_resource", "nick": "bob", "iot": True}
+    mqtt = EcoVacsMQTT('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na', bot, server_address='test.com:f123')
+    assert_equal(8883, mqtt.port)
 
+def test_good_port():
+    bot = {"did": "E0000000001234567890", "class": "126","resource":"test_resource", "nick": "bob", "iot": True}
+    mqtt = EcoVacsMQTT('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na', bot, server_address='test.com:8000')
+    assert_equal(8000, mqtt.port)    
  
 def make_ecovacs_mqtt(bot=None):
     if bot is None:
-        bot = bot = {"did": "E0000000001234567890", "class": "126","resource":"test_resource", "nick": "bob", "iot": True}
+        bot = {"did": "E0000000001234567890", "class": "126","resource":"test_resource", "nick": "bob", "iot": True}
     return EcoVacsMQTT('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na', bot)

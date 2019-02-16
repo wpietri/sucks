@@ -44,9 +44,14 @@ def test_clean_command():
     c = Clean()
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Clean"><clean speed="standard" type="auto" /></ctl>')  # protocol has attribs in other order
+    
     c = Clean('edge', 'high')
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Clean"><clean speed="strong" type="border" /></ctl>')  # protocol has attribs in other order
+
+    c = Clean(iot=True)
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl td="Clean"><clean act="s" speed="standard" type="auto" /></ctl>') # test for iot act is added                         
     
 
 def test_spotarea_command():

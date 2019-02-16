@@ -14,7 +14,6 @@ def test_wrap_command():
     assert_true(search(r'from="20170101abcdefabcdefa@ecouser.net/abcdef12"', c))
     assert_true(search(r'to="E0000000001234567890@126.ecorobot.net/atom"', c))
 
-
 def test_subscribe_to_ctls():
     response = None
 
@@ -58,7 +57,7 @@ def test_xml_to_dict():
 
 def make_ecovacs_xmpp(bot=None):
     if bot is None:
-        bot = bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": False}
+        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": False}
     return EcoVacsXMPP('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na', bot)
 
 

@@ -1018,7 +1018,7 @@ class VacBotCommand:
 
 class Clean(VacBotCommand):
     def __init__(self, mode='auto', speed='normal', iot=False, action='start',terminal=False, **kwargs):
-        if kwargs is None:
+        if kwargs == {}:
             if not iot:
                 super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
             else:
