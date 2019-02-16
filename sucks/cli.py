@@ -179,11 +179,10 @@ def edge(frequency, minutes):
         return CliAction(Edge(), wait=TimeWait(minutes * 60))
 
 
-@cli.command(help='spotcleans provided room(s) for the specified number of minutes')
+@cli.command(help='spotcleans provided room(s)')
 @click.argument('room', type=click.STRING)
-@click.argument('minutes', type=click.FLOAT)
-def spotclean(room, minutes):
-    return CliAction(SpotArea('start', room), wait=TimeWait(minutes * 60))
+def spotclean(room):
+    return CliAction(SpotArea('start', room), wait=StatusWait('charge_status', 'returning'))
 
 @cli.command(help='returns to charger')
 def charge():

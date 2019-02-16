@@ -27,13 +27,14 @@ _LOGGER = logging.getLogger(__name__)
 CLEAN_MODE_AUTO = 'auto'
 CLEAN_MODE_EDGE = 'edge'
 CLEAN_MODE_SPOT = 'spot'
-CLEAN_MODE_SPOT_AREA = 'spotarea'
+CLEAN_MODE_SPOT_AREA = 'spot_area'
 CLEAN_MODE_SINGLE_ROOM = 'single_room'
 CLEAN_MODE_STOP = 'stop'
 
 CLEAN_ACTION_START = 'start'
 CLEAN_ACTION_PAUSE = 'pause'
 CLEAN_ACTION_RESUME = 'resume'
+CLEAN_ACTION_STOP = 'stop'
 
 FAN_SPEED_NORMAL = 'normal'
 FAN_SPEED_HIGH = 'high'
@@ -67,13 +68,21 @@ CLEAN_ACTION_TO_ECOVACS = {
     CLEAN_ACTION_START: 's',
     CLEAN_ACTION_PAUSE: 'p',
     CLEAN_ACTION_RESUME: 'r',
+    CLEAN_ACTION_STOP: 'h',
+}
+
+CLEAN_ACTION_FROM_ECOVACS = {
+    's': CLEAN_ACTION_START,
+    'p': CLEAN_ACTION_PAUSE,
+    'r': CLEAN_ACTION_RESUME,
+    'h': CLEAN_ACTION_STOP,    
 }
 
 CLEAN_MODE_FROM_ECOVACS = {
     'auto': CLEAN_MODE_AUTO,
     'border': CLEAN_MODE_EDGE,
     'spot': CLEAN_MODE_SPOT,
-    'SpotArea': CLEAN_MODE_SPOT_AREA,
+    'spot_area': CLEAN_MODE_SPOT_AREA,
     'singleroom': CLEAN_MODE_SINGLE_ROOM,
     'stop': CLEAN_MODE_STOP,
     'going': CHARGE_MODE_RETURNING
@@ -397,12 +406,15 @@ class VacBot():
             self.iot.subscribe_to_ctls(self._handle_ctl)
             self.mqtt = EcoVacsMQTT(user, domain, resource, secret, continent, vacuum, server_address)            
             self.mqtt.subscribe_to_ctls(self._handle_ctl)
-            self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address)
-            self.xmpp.subscribe_to_ctls(self._handle_ctl)
-
+            #self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address)
+            #Uncomment line to allow unencrypted plain auth
+            #self.xmpp['feature_mechanisms'].unencrypted_plain = True
+            #self.xmpp.subscribe_to_ctls(self._handle_ctl)
         
         else:
             self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address)
+            #Uncomment line to allow unencrypted plain auth
+            #self.xmpp['feature_mechanisms'].unencrypted_plain = True
             self.xmpp.subscribe_to_ctls(self._handle_ctl)
 
 
@@ -413,6 +425,7 @@ class VacBot():
         else:
             self.mqtt.connect_and_wait_until_ready()
             self.mqtt.schedule(30, self.send_ping)
+            #self.xmpp.connect_and_wait_until_ready()            
 
         if self._monitor:
             # Do a first ping, which will also fetch initial statuses if the ping succeeds
@@ -459,19 +472,15 @@ class VacBot():
         type = event['type']
         try:
             type = CLEAN_MODE_FROM_ECOVACS[type]
+            if self.vacuum['iot']: #Was able to parse additional status from the IOT, may apply to XMPP too
+                statustype = event['st']
+                statustype = CLEAN_ACTION_FROM_ECOVACS[statustype]
+                if statustype == CLEAN_ACTION_STOP or statustype == CLEAN_ACTION_PAUSE:
+                    type = statustype
         except KeyError:
             _LOGGER.warning("Unknown cleaning status '" + type + "'")
         self.clean_status = type
-        self.vacuum_status = type
-
-        if self.vacuum['iot']: #Was able to parse additional status from the IOT, may apply to XMPP too
-            cleaning = event.get('st', None)
-            if cleaning == 'p':
-                self.clean_status = 'paused'
-            elif cleaning == 'h':
-                self.clean_status = 'standby'
-            else:
-                self.clean_status = 'cleaning'
+        self.vacuum_status = type        
         
         fan = event.get('speed', None)
         if fan is not None:
@@ -541,13 +550,13 @@ class VacBot():
         try:
             if not self.vacuum['iot']:
                 self.xmpp.send_ping(self._vacuum_address()) 
-            elif self.vacuum['iot']:
+            elif self.vacuum['iot']: 
                 if not self.mqtt.send_ping():   
                     raise RuntimeError()
                                     
             #self.xmpp.send_ping(EcoVacsAPI.REALM) #IOT vacuums are using the realm instead
             #Some devices may utilize this, but it appears to 
-            # just be an oversight in the app communidcations.  IOT should probably be using MQTT pings (which are automatic when connected)
+            # just be an oversight in the app communications.  IOT should probably be using MQTT pings (which are automatic when connected)
     
            
         except XMPPError as err:
@@ -618,6 +627,7 @@ class VacBot():
             self.xmpp.disconnect(wait=wait)
         else:
             self.mqtt._disconnect()
+            #self.xmpp.disconnect(wait=wait)
         
             
 
@@ -793,7 +803,7 @@ class EcoVacsMQTT(ClientMQTT):
         self.ctl_subscribers.append(function)
 
     def _handle_ctl(self, client, userdata, message):
-        _LOGGER.debug("EcoVacs MQTT Received Message on Topic: {} - Message: {}".format(message.topic, str(message.payload.decode("utf-8"))))
+        #_LOGGER.debug("EcoVacs MQTT Received Message on Topic: {} - Message: {}".format(message.topic, str(message.payload.decode("utf-8"))))
         as_dict = self._ctl_to_dict(message.topic, str(message.payload.decode("utf-8")))
         if as_dict is not None:
             for s in self.ctl_subscribers:
@@ -843,7 +853,6 @@ class EcoVacsMQTT(ClientMQTT):
         _LOGGER.debug("*** MQTT sending ping ***")
         rc = self._send_simple_command(MQTTPublish.paho.PINGREQ)
         if rc == MQTTPublish.paho.MQTT_ERR_SUCCESS:
-            _LOGGER.debug("*** MQTT ping acknowledged ***")   
             return True         
         else:
             return False
@@ -868,33 +877,9 @@ class EcoVacsMQTT(ClientMQTT):
         self.wait_until_ready()
 
 
-    # def send_command(self, xml, recipient): #MQTT doesn't seem to care about commands we send today, but leaving in case of futures
-    #     #c = self._wrap_command(xml, recipient)
-    #     #_LOGGER.debug('Sending command {0}'.format(c))
-    #     txml = '"<ctl td="Move"><move action="backward" /></ctl>'
-    #     _LOGGER.debug('Sending command {0}'.format(txml))
-    #     self.publish('iot/atr/Move/' + self.vacuum['did'] + '/' + self.vacuum['class'] + '/' + self.vacuum['resource'] + '/x', txml)
-    #     #<ctl td="Move"><move action="backward" /></ctl>
-
-    # def _wrap_command(self, ctl, recipient):
-    #     q = self.make_iq_query(xmlns=u'com:ctl', ito=recipient, ifrom=self._my_address())
-    #     q['type'] = 'set'
-    #     for child in q.xml:
-    #         if child.tag.endswith('query'):
-    #             child.append(ctl)
-    #             return q
-
-    # def _my_address(self):
-    #     if not self.vacuum['iot']:
-    #     return self.user + '@' + self.domain + '/' + self.boundjid.resource
-    # else:
-    #     return self.user + '@' + self.domain + '/' + self.resource
-
-
 class EcoVacsXMPP(ClientXMPP):
     def __init__(self, user, domain, resource, secret, continent, vacuum, server_address=None ):
         ClientXMPP.__init__(self, user + '@' + domain, '0/' + resource + '/' + secret)
-
         self.user = user
         self.domain = domain
         self.resource = resource
@@ -909,6 +894,7 @@ class EcoVacsXMPP(ClientXMPP):
         self.ctl_subscribers = []
         self.ready_flag = Event()
 
+        
     def wait_until_ready(self):
         self.ready_flag.wait()
 
@@ -979,6 +965,7 @@ class EcoVacsXMPP(ClientXMPP):
         q.send()
 
     def connect_and_wait_until_ready(self):
+        
         self.connect(self.server_address)
         self.process()
         self.wait_until_ready()
@@ -1059,9 +1046,9 @@ class Stop(Clean):
 class SpotArea(Clean):
     def __init__(self, action='start', namedarea='', customarea='', cleanings='1'):
         if namedarea != '': #For cleaning specified map area
-            super().__init__('spotarea', 'normal', act=CLEAN_ACTION_TO_ECOVACS[action], mid=namedarea)
+            super().__init__('spot_area', 'normal', act=CLEAN_ACTION_TO_ECOVACS[action], mid=namedarea)
         elif customarea != '': #For cleaning custom map area, and specify deep amount 1x/2x
-            super().__init__('spotarea' ,'normal',act=CLEAN_ACTION_TO_ECOVACS[action], p=customarea, deep=cleanings)
+            super().__init__('spot_area' ,'normal',act=CLEAN_ACTION_TO_ECOVACS[action], p=customarea, deep=cleanings)
         else:
             #no valid entries
             raise ValueError("must provide namedarea or customarea for spotarea clean")
