@@ -139,7 +139,6 @@ def test_get_battery_state_command():
                   b'<ctl td="GetBatteryInfo" />')
 
 
-
 def test_move_command():
     c = Move(action='left')
     assert_equals(ElementTree.tostring(c.to_xml()),
@@ -165,9 +164,16 @@ def test_get_lifepsan_command():
     c = GetLifeSpan('main_brush')
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="GetLifeSpan" type="Brush" />')
+    
     c = GetLifeSpan('side_brush')
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="GetLifeSpan" type="SideBrush" />')
+    
     c = GetLifeSpan('filter')
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="GetLifeSpan" type="DustCaseHeap" />')
+
+def test_set_time_command():
+    c = SetTime('1234', 'GMT-5')
+    assert_equals(ElementTree.tostring(c.to_xml()),
+                  b'<ctl td="SetTime"><time t="1234" tz="GMT-5" /></ctl>')                  

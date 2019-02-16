@@ -47,6 +47,13 @@ def test_iotapi_response():
         rtnval = api._EcoVacsAPI__call_portal_api(api.IOTDEVMANAGERAPI, '', c)        
         assert_equal(rtnval, {}) #Right now it sends back a blank object
 
+def test_send_command():
+    from unittest.mock import MagicMock        
+    x = make_ecovacs_iot()
+    x._handle_ctl = MagicMock()
+    x.api._EcoVacsAPI__call_portal_api = MagicMock()
+    x.send_command(Clean(iot=True), '123')
+
 
 def test_subscribe_to_ctls():
     response = None
@@ -93,6 +100,18 @@ def test_xml_to_dict():
     assert_dict_equal(
         x._ctl_to_dict(cmd,message['resp']),
         {'event': 'life_span','ret':'ok', 'type': 'brush', 'left': '9876', 'total': '18000'})
+
+    cmd = VacBotCommand("Charge")
+    message['resp'] = "<ctl ts='1547823651958' td='ChargeState'><charge type='Going' h='' r='a' s='' g='0'/></ctl>"
+    assert_dict_equal(
+        x._ctl_to_dict(cmd,message['resp']),
+        {'type': 'going', 'h': '', 'r': 'a', 's': '', 'g': '0', 'event': 'charge_state'}) 
+
+    cmd = VacBotCommand("GetTestCommand")
+    message['resp'] = "<ctl td='TestCommand'><test type='command'/></ctl>"
+    assert_dict_equal(
+        x._ctl_to_dict(cmd,message['resp']),
+        {'type': 'command', 'event': 'test_command'}) #Test action.name.replace Get
 
     cmd = VacBotCommand("Charge")
     message['resp'] = "<ctl ret='fail' errno='8'/>"

@@ -2,10 +2,9 @@ from nose.tools import *
 
 from sucks import *
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from sleekxmpp.exceptions import XMPPError
 from paho.mqtt.client import MQTT_ERR_UNKNOWN as MQTTError
-
 
 
 def test_handle_clean_report():
@@ -30,6 +29,23 @@ def test_handle_clean_report():
     v._handle_ctl({'event': 'clean_report', 'type': 'a_type_not_supported_by_sucks', 'speed': 'a_weird_speed'})
     assert_equals('a_type_not_supported_by_sucks', v.clean_status)
     assert_equals('a_weird_speed', v.fan_speed)
+
+
+             
+def test_not_iot_send_command_clean():
+    from unittest.mock import MagicMock
+    v = a_vacbot(iot=False)
+    v.xmpp.send_command = MagicMock()
+    v.send_command(VacBotCommand('Clean'))
+    assert v.xmpp.send_command.called #test when iot is False it uses xmpp.send_command
+
+
+def test_iot_send_command_clean():
+    from unittest.mock import MagicMock
+    v = a_vacbot(iot=True)
+    v.iot.send_command = MagicMock()
+    v.send_command(VacBotCommand('Clean'))
+    assert v.iot.send_command.called #test when iot is True it uses iot.send_command
 
 
 def test_handle_charge_state():
@@ -94,13 +110,6 @@ def test_handle_battery_info():
     assert_equals(0.0, v.battery_status)
 
 
-def test_handle_geterrors():
-    v = a_vacbot()
-    
-    #v._handle_error
-
-    #ssert_equals({}, v.components)
-
 def test_lifespan_reports():
     v = a_vacbot()
     assert_equals({}, v.components)
@@ -119,6 +128,10 @@ def test_lifespan_reports():
     v._handle_ctl({'event': 'life_span', 'type': 'a_weird_component', 'total': '100', 'val': '87'})
     assert_equals({'side_brush': 0, 'main_brush': 0.01, 'a_weird_component': 0.87}, v.components)
 
+    v._handle_ctl({'event': 'life_span', 'type': 'side_brush', 'total': '100', 'left': '120'})
+    assert_equals(2.0, v.components['side_brush']) #test left (2 hours / 120 mins) instead of val
+
+
 def test_is_cleaning():
     v = a_vacbot()
 
@@ -135,6 +148,14 @@ def test_is_cleaning():
 
     v._handle_ctl({'event': 'charge_state', 'type': 'going'})
     assert_false(v.is_cleaning)
+
+    v = a_vacbot(iot=True)
+    v._handle_ctl({'event': 'clean_report', 'type': 'spot_area', 'speed':'normal','st':'h'})
+    assert_false(v.is_cleaning) #test iot and state paused
+
+    v = a_vacbot(iot=True)
+    v._handle_ctl({'event': 'clean_report', 'type': 'spot_area', 'speed':'normal','st':'r'})
+    assert_true(v.is_cleaning) #test iot and state running
 
 def test_is_charging():
     v = a_vacbot()
@@ -314,7 +335,10 @@ def test_error_event_subscription():
     mock = Mock()
     v.errorEvents.subscribe(mock)
     v._handle_ctl({'event': 'error', 'error': 'an_error_name'})
-    mock.assert_called_once_with('an_error_name')
+    v._handle_ctl({'event': 'error', 'errs': 'an_error_name2'}) #added for testing errs
+    assert_equals(2, mock.call_count)
+    #mock.assert_called_once_with('an_error_name')
+
 
     # Test unsubscribe
     mock = Mock()
@@ -346,6 +370,11 @@ def test_bot_address():
     assert_equals('E0000000001234567890@126.ecorobot.net/atom', v._vacuum_address())
 
 
+def test_bot_address_iot():
+    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot":True})
+    assert_equals('E0000000001234567890', v._vacuum_address())
+
+
 def test_model_variation():
     v = a_vacbot(bot={"did": "E0000000001234567890", "class": "141", "nick": "bob","iot":False})
     assert_equals('E0000000001234567890@141.ecorobot.net/atom', v._vacuum_address())
@@ -357,3 +386,64 @@ def a_vacbot(bot=None, iot=False, monitor=False):
         bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": iot}
     return VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
                   bot, 'na', monitor=monitor)
+
+def test_str_to_bool():
+     assert_raises(ValueError, str_to_bool, None) #Value error if str_to_bool can't convert
+ 
+
+def test_connect_and_wait():
+    from unittest.mock import MagicMock        
+    v = a_vacbot(iot=False, monitor=True)
+    v.xmpp.connect_and_wait_until_ready = MagicMock()
+    v.send_ping = MagicMock()
+    v.xmpp.schedule = MagicMock()
+    v.connect_and_wait_until_ready()
+    assert v.xmpp.schedule.called #test when iot is False it uses xmpp.schedule
+
+    v = a_vacbot(iot=True)
+    v.mqtt.connect_and_wait_until_ready = MagicMock()
+    v.send_ping = MagicMock()
+    v.mqtt.schedule = MagicMock()
+    v.connect_and_wait_until_ready()
+    assert v.mqtt.schedule.called #test when iot is True it uses mqtt.schedule
+
+def test_run():
+    from unittest.mock import MagicMock        
+    v = a_vacbot(iot=False)
+    v.send_command = MagicMock()
+    v.run(VacBotCommand('Clean'))
+    assert v.send_command.called
+
+def test_disconnect():
+    from unittest.mock import MagicMock        
+    v = a_vacbot(iot=False)
+    v.xmpp.disconnect = MagicMock()
+    v.disconnect()
+    assert v.xmpp.disconnect.called
+
+    v = a_vacbot(iot=True)
+    v.mqtt.disconnect = MagicMock()
+    v.disconnect()
+    assert v.mqtt.disconnect.called
+
+def test_refresh_all():
+    from unittest.mock import MagicMock        
+    v = a_vacbot(iot=False)
+    v.refresh_statuses = MagicMock()
+    v.refresh_components = MagicMock
+    v.request_all_statuses()
+    assert v.refresh_components.called and v.refresh_statuses.called
+
+def test_refresh_statuses():
+    from unittest.mock import MagicMock        
+    v = a_vacbot(iot=False)
+    v.run = MagicMock()    
+    v.refresh_statuses()
+    assert v.run.called
+
+def test_refresh_components():
+    from unittest.mock import MagicMock        
+    v = a_vacbot(iot=False)
+    v.run = MagicMock()    
+    v.refresh_components()
+    assert v.run.called
