@@ -49,7 +49,7 @@ def test_clean_command():
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Clean"><clean speed="strong" type="border" /></ctl>')  # protocol has attribs in other order
 
-    c = Clean(iot=True)
+    c = Clean(iotmq=True)
     assert_equals(ElementTree.tostring(c.to_xml()),
                   b'<ctl td="Clean"><clean act="s" speed="standard" type="auto" /></ctl>') # test for iot act is added                         
     

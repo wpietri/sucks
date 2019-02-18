@@ -31,7 +31,6 @@ def test_subscribe_to_ctls():
     x._handle_ctl(query)
     assert_dict_equal(response, {'event': 'clean_report', 'type': 'auto'})
 
-
 def test_xml_to_dict():
     x = make_ecovacs_xmpp()
 
@@ -53,13 +52,18 @@ def test_xml_to_dict():
     assert_dict_equal(
         x._ctl_to_dict(make_ctl('<ctl td="LifeSpan" type="DustCaseHeap" val="-050" total="365"/>')),
         {'event': 'life_span', 'type': 'dust_case_heap', 'val': '-050', 'total': '365'})
+    
+    assert_equals(x._ctl_to_dict(make_ctl('<ctl />')), None)
 
 
-def make_ecovacs_xmpp(bot=None):
+def make_ecovacs_xmpp(bot=None, server_address=None):
     if bot is None:
-        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iot": False}
-    return EcoVacsXMPP('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na', bot)
+        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iotmq": False}    
+    return EcoVacsXMPP('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12', 'na', bot, server_address=server_address)
 
+def test_xmpp_customaddress():
+    x = make_ecovacs_xmpp(server_address="test.xmppserver.com")
+    assert_equals(x.server_address, "test.xmppserver.com")
 
 def make_ctl(string):
     return ET.fromstring('<query xmlns="com:ctl">' + string + '</query>')[0]
