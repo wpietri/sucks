@@ -60,8 +60,8 @@ There are a few different endpoints within the API that have been seen and are u
 | Endpoint                      | Description                               |
 | ----------------------------- | ----------------------------------------- |
 | /users/user.do                | Handles user / account functions          |
-| /iot/devmanager.do            | Handles sending commands to "IOT" devices |
-| /pim/product/getProductIotMap | Provides the "IOT" Product map            |
+| /iot/devmanager.do            | Provides a RestAPI that handles sending commands to "IOTMQ" devices |
+| /pim/product/getProductIotMap | Provides a listing of "IOT" Products            |
 
 
 
@@ -74,27 +74,16 @@ from step 4, gets the list of devices; that's needed for talking to the
 vacuum via XMPP
 7. POST
 portal-na.ecouser.net/api/pim/product/getProductIotMap
-getProductIotMap - Provides a list of "IOT" products, the devices are referenced in the table below and these are assumed to be "IOT" devices within the library.
+getProductIotMap - Provides a list of "IOT" products, it isn't clear what the app uses these for at this time, possibly for determining how to get updates.
 
-    |IOT Products |
-    |---|
-    |DEEBOT 600 Series|
-    |DEEBOT OZMO Slim10 Series |
-    |DEEBOT OZMO 900|
-    |DEEBOT 711|
-    |DEEBOT 710|
-    |DEEBOT 900 Series|
+At this point depending on your device you will connect to either an XMPP server, or an MQTT server.  
 
-
-
-At this point depending on your device you will connect to either an XMPP server, or an MQTT server.  This is believed to be based on the "IOT Products" vs "Non-IOT" products. 
-
-| "Non-IOT" Products                                                                | "IOT" Products                                                                                                                                                        |
+| "IOT XMPP" Products                                                                | "IOT MQ" Products                                                                                                                                                        |
 |----------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Connect to an XMPP server to send commands to devices and receive status results | Connect to an MQTT server to subscribe to status messages and results.  A Rest API is utilized to send commands to devices, but can also be used to obtain statuses. |
 
 
-## XMPP - ("Non-IOT")
+## XMPP - ("IOT XMPP")
 
 The app establishes a connection to an XMPP server and logs in using
 a secret that comes from the earlier HTTPS calls. It then sends XMPP IQ
@@ -111,7 +100,7 @@ The Android App uses the following XMPP messaging servers:
 |FR, ES, UK, NO, MX, DE, PT, CH, AU, IT, NL, SE, BE, DK|msg-eu.ecouser.net|
 |Any other|msg-ww.ecouser.net|
 
-## MQTT - ("IOT")
+## MQTT - ("IOT MQ")
 
 The app establishes a connection to an MQTT server and logs in using
 a secret that comes from the earlier HTTPS calls.
@@ -130,9 +119,9 @@ It is believed the MQTT servers mirror the XMPP servers, but only the NA and WW 
 |US|mq-na.ecouser.net|
 |"World-wide"|mq-ww.ecouser.net|
 
-## Rest API - ("IOT")
+## Rest API - ("IOT MQ")
 
-For IOT devices the app sends commands to the device over a Rest API utilizing the secret that comes from the earlier HTTPS calls.  This API has only been tested from an "IOT" device, but could possibly work for "Non-IOT" devices as well.
+For IOT MQ devices the app sends commands to the device over a Rest API utilizing the secret that comes from the earlier HTTPS calls.  This API has only been tested from an "IOT MQ" device, but could possibly work for other devices as well.
 
 The Rest API utilizes the same portal URL as used previously, but with the iot/devmanager endpoint:
 `
@@ -171,7 +160,7 @@ Commands are sent via POST in the format of:
   - type `spot` spot cleaning program
   - type `singleroom` cleaning a single room 
   - type `stop` bot at full stop
-  - type `SpotArea` cleaning a mapped room
+  - type `SpotArea` cleaning a mapped room (mapping robots only)
   - speed `standard` regular fan speed (suction)
   - speed `strong` high fan speed (suction)
 
@@ -195,7 +184,7 @@ Commands are sent via POST in the format of:
 ### Battery State
 
 Battery charge level. 080 = 80% charged. State is broadcast
-continously when the robot is running och charging, but can also
+continously when the robot is running or charging, but can also
 be requested manually.
 
 - *Request* `<ctl td="GetBatteryInfo" />`
@@ -230,17 +219,42 @@ It's presumed that the timers need to be reset manually.
 
 ### Configuration
 
-**Set/get robot internal clock**
+#### Set/get robot internal clock
 - `<ctl td="SetTime"><time t="1509622697" tz="+8"/></ctl>`
 - `<ctl td="GetTime"></ctl>`
   - Time is specified as a UNIX timestamp and timezone + or - UTC offset.
 
-**Get firmware version**
+#### Get firmware version
 `<ctl td="GetVersion" name="FW"/>` 
 
-**Get robot logs**
+#### Get robot logs
 `<ctl td="GetLog"></ctl>` 
 
+#### Get/Set option value
+Gets or sets value for option (0==Off, 1==On)
+##### GetOnOff
+  - Do Not Disturb - `<ctl td="GetOnOff" t="b"/>`
+  - Continuous Cleaning - `<ctl td="GetOnOff" t="g"/>`
+  - Silence Voice Report - `<ctl td="GetOnOff" t="s"/>`
+
+    Returns `<ctl ret='ok' on='1'/>`
+##### SetOnOff
+  - Do Not Disturb - `<ctl td="SetOnOff" t="b" on="0"/>`
+  - Continuous Cleaning - `<ctl td="SetOnOff" t="g" on="0"/>`
+  - Silence Voice Report - `<ctl td="SetOnOff" t="s" on="0"/>`
+
+    Returns `<ctl ret='ok'/>`
+
+#### Schedules
+##### GetSched
+`<ctl td="GetSched"/>`
+
+Gets any schedules for the robot.
+    
+- No Schedules
+  - `<ctl ret='ok'/>`
+- Schedule
+  - `<ctl ret='ok'><s n='FRASITLP' o='0' h='13' m='2' r='0000000' f='p'><ctl td='Clean'><clean type='auto'/></ctl></s></ctl>`
 
 ### Errors
 
@@ -266,18 +280,37 @@ HostHang, then proceeds to stop and broadcasts 100 NoError.
 |-----|-----|
 |100|NoError: Robot is operational|
 |101|BatteryLow: Low battery|
-|102|HostHang: Robot is stuck|
-|103|WheelAbnormal: Wheels are not moving as expected|
-|104|DownSensorAbnormal: Down sensor is getting abnormal values|
+|102|HostHang: Robot is off the floor|
+|103|WheelAbnormal: Driving Wheel malfunction|
+|104|DownSensorAbnormal: Excess dust on the Anti-Drop Sensors|
+|105|Stuck: Robot is stuck|
+|106|SideBrushExhausted: Side Brushes have expired|
+|107|DustCaseHeapExhausted: Dust case filter expired|
+|108|SideAbnormal: Side Brushes are tangled|
+|109|RollAbnormal: Main Brush is tangled|
 |110|NoDustBox: Dust Bin Not installed|
+|111|BumpAbnormal: Bump sensor stuck|
+|112|LDS: LDS "Laser Distance Sensor" malfunction|
+|113|MainBrushExhausted: Main brush has expired|
+|114|DustCaseFilled: Dust bin full|
+|115|BatteryError: |
+|116|ForwardLookingError: |
+|117|GyroscopeError: |
+|118|StrainerBlock: |
+|119|FanError: |
+|120|WaterBoxError: |
+|201|AirFilterUninstall: |
+|202|UltrasonicComponentAbnormal|
+|203|SmallWheelError|
+|UNKNOW|"unknow"|
 
-These codes are taken from model M81 Pro. Error codes may differ
+These codes were gathered from the Android app source, but may differ
 between models.
 
 ### Sounds
-Different sid "Sound IDs" will play different sounds.  If the vacuum has Voice Report disabled, these won't play.
+Different sid "Sound IDs" will play different sounds.  If the vacuum has Voice Report disabled, these won't play.  The table below was compiled by testing against a D900 series.
     
-`<ctl td="PlaySound" sid="1" />`
+`<ctl td="PlaySound" sid="0" />`
 
 |SID |Description                                               |
 |-----|------------------------------------------------------------|
@@ -311,19 +344,6 @@ Different sid "Sound IDs" will play different sounds.  If the vacuum has Voice R
 | 84  | I am ready for mopping                                     |
 | 85  | Please remove the mopping plate when I am building the map |
 | 86  | Cleaning is complete returning to the charging dock        |
-| 89  | LVS Malfunction please try to tap the LVS                  |
-| 90  | I am upgrading please wait                                 |
+| 89  | LDS Malfunction please try to tap the LDS                  |
+| 90  | I am upgrading please wait  |
 
-
-### Untested commands
-
-```
-<ctl td="SetOnOff" t="b" on="1"/>
-<ctl td="GetOnOff" />
-<ctl id="12351409" td="PlaySound" sid="0"/>
-<ctl id="30800321" td="GetSched"/>
-```
-
-It appears that it adds an extra id when it cares to receive a specific response.
-This is a little odd in that the iq blocks already contain ids, but perhaps one
-is more a server id and the other is used by the robot itself.
