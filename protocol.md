@@ -347,3 +347,48 @@ Different sid "Sound IDs" will play different sounds.  If the vacuum has Voice R
 | 89  | LDS Malfunction please try to tap the LDS                  |
 | 90  | I am upgrading please wait  |
 
+### SpotAreas
+For bots with mapping capability this tells a bot to clean specified rooms.
+
+For the CLI - the `spotclean` command takes a csv of ints - ex `spotclean 0,1`
+
+For the Library - you could use `vacbot.run(SpotArea('start', '0,1'))`
+
+"0,1" is a list of mapIDs the bot should clean. Each of these corresponds to a room or area the bot mapped. In the app, these are what show the letters over rooms mapID (0) == room ("A"), (1) == "B", etc.
+
+If you want to see your MapSet areas, you can use the library. Set --debug for sucks and then use a custom command:
+`vacbot.run(VacBotCommand("GetMapSet", {"tp":"sa"}))`
+
+You'll see in DEBUG something like:
+```
+sucks DEBUG got {'id': 'ralnsy', 'ret': 'ok', 'resp': "<ctl ret='ok' tp='sa' msid='11'><m mid='0' p='1'/><m mid='1' p='1'/><m mid='2' p='1'/><m mid='3' p='1'/><m mid='4' p='1'/><m mid='5' p='1'/><m mid='6' p='1'/><m mid='7' p='1'/><m mid='8' p='1'/></ctl>"}
+```
+This tells you I have 9 rooms mapped (mid= 0 - 8) or A-I, but you should be able to compare to the map in the app now to know which mid == what room.
+
+#### SpotArea Friendly Names
+For bots with mapping capability the app automatically names areas (rooms) A-Z.  You can rename these to "friendly names" - something the app won't let you do natively.
+
+Use the above "GetMapSet" custom command and then convert the xml to json:
+``` xml
+<ctl ret='ok' tp='sa' msid='11'><m mid='0' p='1'/><m mid='1' p='1'/><m mid='2' p='1'/><m mid='3' p='1'/><m mid='4' p='1'/><m mid='5' p='1'/><m mid='6' p='1'/><m mid='7' p='1'/><m mid='8' p='1'/></ctl>
+```
+becomes
+``` javascript
+{"ctl":{"ret":"ok","tp":"sa","msid":"11","m":[{"mid":"0","p":"1"},{"mid":"1","p":"1"},{"mid":"2","p":"1"},{"mid":"3","p":"1"},{"mid":"4","p":"1"},{"mid":"5","p":"1"},{"mid":"6","p":"1"},{"mid":"7","p":"1"},{"mid":"8","p":"1"}]}}
+```
+Now you need to add a "n" attribute which contains the friendly name:
+``` javascript
+{"ctl":{"ret":"ok","tp":"sa","msid":"11","m":[{"mid":"0","n":"Entry"},{"mid":"1","n":"Master Bath"},{"mid":"2","n":"Master"},{"mid":"3","n":"Office"},{"mid":"4","n":"Play Room"},{"mid":"5","n":"Craft Room"},{"mid":"6","n":"Kitchen"},{"mid":"7","n":"Sun Room"},{"mid":"8","n":"Garage Entry"}]}}
+```
+Remove the api response details ("ctl" and "ret"):
+``` javascript
+{"tp":"sa","msid":"11","m":[{"mid":"0","n":"Entry"},{"mid":"1","n":"Master Bath"},{"mid":"2","n":"Master"},{"mid":"3","n":"Office"},{"mid":"4","n":"Play Room"},{"mid":"5","n":"Craft Room"},{"mid":"6","n":"Kitchen"},{"mid":"7","n":"Sun Room"},{"mid":"8","n":"Garage Entry"}]}
+```
+Lastly use the below command to issue the rename:
+```
+vacbot.run(VacBotCommand("RenameM", {"tp":"sa","msid":"11","m":[{"mid":"0","n":"Entry"},{"mid":"1","n":"Master Bath"},{"mid":"2","n":"Master"},{"mid":"3","n":"Office"},{"mid":"4","n":"Play Room"},{"mid":"5","n":"Craft Room"},{"mid":"6","n":"Kitchen"},{"mid":"7","n":"Sun Room"},{"mid":"8","n":"Garage Entry"}]}))
+```
+You should then see the friendly names in the app when selecting an area to clean.
+
+**Note:** You cannot use the friendly names when starting a clean, you must use the mid.
+
