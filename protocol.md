@@ -57,15 +57,14 @@ the XMPP/device server.
 There are a few different endpoints within the API that have been seen and are used in the library:
 
 
-| Endpoint                      | Description                               |
-| ----------------------------- | ----------------------------------------- |
-| /users/user.do                | Handles user / account functions          |
-| /iot/devmanager.do            | Provides a RestAPI that handles sending commands to "IOTMQ" devices |
-| /pim/product/getProductIotMap | Provides a listing of "IOT" Products            |
+| Endpoint | Description |
+| - | - |
+| /users/user.do | Handles user / account functions |
+| /iot/devmanager.do | Provides a RestAPI that handles sending commands to "IOTMQ" devices |
+| /pim/product/getProductIotMap | Provides a listing of "IOT" Products |
 
 
-
-4. POST portal-na.ecouser.net/api/users/user.do loginByItToken - trades the
+1. POST portal-na.ecouser.net/api/users/user.do loginByItToken - trades the
 authCode from the previous call for yet another token
 5. POST ne-na.ecouser.net:8018/notify_engine.do - not sure what this is
 for; my script skips this and seems to work fine
@@ -78,8 +77,8 @@ getProductIotMap - Provides a list of "IOT" products, it isn't clear what the ap
 
 At this point depending on your device you will connect to either an XMPP server, or an MQTT server.  
 
-| "IOT XMPP" Products                                                                | "IOT MQ" Products                                                                                                                                                        |
-|----------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| "IOT XMPP" Products | "IOT MQ" Products |
+| - | - |
 | Connect to an XMPP server to send commands to devices and receive status results | Connect to an MQTT server to subscribe to status messages and results.  A Rest API is utilized to send commands to devices, but can also be used to obtain statuses. |
 
 
@@ -93,7 +92,7 @@ elements that appear to be commands.
 The Android App uses the following XMPP messaging servers:
 
 |Country|URL|
-|------|--------|
+| - | - |
 |CH|msg.ecouser.net|
 |TW, MY, JP, SG, TH, HK, IN, KR|msg-as.ecouser.net|
 |US|msg-na.ecouser.net|
@@ -115,7 +114,7 @@ iot/atr/+/{deviceID}/{deviceClass}/{deviceResource}/+
 It is believed the MQTT servers mirror the XMPP servers, but only the NA and WW have been tested so far.
 
 |Country|URL|
-|------|--------|
+|-|-|
 |US|mq-na.ecouser.net|
 |"World-wide"|mq-ww.ecouser.net|
 
@@ -146,6 +145,8 @@ Commands are sent via POST in the format of:
 "toType": "vacuum.class"
 }   
 ```
+
+## Commands
 
 ### Cleaning
 
@@ -178,7 +179,6 @@ Commands are sent via POST in the format of:
   - `Going` trying to return to charger
   - `SlotCharging` currently charging in dock
   - `WireCharging` currently charging by cable
-
 
 
 ### Battery State
@@ -277,7 +277,7 @@ HostHang, then proceeds to stop and broadcasts 100 NoError.
 **Known error codes**
 
 |Code|Description|
-|-----|-----|
+|-|-|
 |100|NoError: Robot is operational|
 |101|BatteryLow: Low battery|
 |102|HostHang: Robot is off the floor|
@@ -312,8 +312,8 @@ Different sid "Sound IDs" will play different sounds.  If the vacuum has Voice R
     
 `<ctl td="PlaySound" sid="0" />`
 
-|SID |Description                                               |
-|-----|------------------------------------------------------------|
+| SID | Description |
+|-|-|
 | 0   | Startup Music Chime                                        |
 | 3   | I Am Suspended                                             |
 | 4   | Check Driving Wheels                                       |
