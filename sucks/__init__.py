@@ -401,6 +401,8 @@ class VacBot():
         else:            
             self.iotmq = EcoVacsIOTMQ(user, domain, resource, secret, continent, vacuum, server_address, verify_ssl=verify_ssl)            
             self.iotmq.subscribe_to_ctls(self._handle_ctl)
+            #The app still connects to XMPP as well, but only issues ping commands.
+            #Everything works without XMPP, so leaving the below commented out.
             #self.xmpp = EcoVacsXMPP(user, domain, resource, secret, continent, vacuum, server_address)
             #Uncomment line to allow unencrypted plain auth
             #self.xmpp['feature_mechanisms'].unencrypted_plain = True
@@ -413,7 +415,7 @@ class VacBot():
         else:
             self.iotmq.connect_and_wait_until_ready()
             self.iotmq.schedule(30, self.send_ping)
-            #self.xmpp.connect_and_wait_until_ready()            
+            #self.xmpp.connect_and_wait_until_ready() #Leaving in case xmpp is given to iotmq in the future        
 
         if self._monitor:
             # Do a first ping, which will also fetch initial statuses if the ping succeeds
@@ -539,12 +541,7 @@ class VacBot():
                 self.xmpp.send_ping(self._vacuum_address()) 
             elif self.vacuum['iotmq']: 
                 if not self.iotmq.send_ping():   
-                    raise RuntimeError()
-                                    
-            #self.xmpp.send_ping(EcoVacsAPI.REALM) #IOT vacuums are using the realm instead
-            #Some devices may utilize this, but it appears to 
-            # just be an oversight in the app communications.  IOT should probably be using MQTT pings (which are automatic when connected)
-    
+                    raise RuntimeError()                
            
         except XMPPError as err:
             _LOGGER.warning("Ping did not reach VacBot. Will retry.")
@@ -613,7 +610,7 @@ class VacBot():
             self.xmpp.disconnect(wait=wait)
         else:
             self.iotmq._disconnect()
-            #self.xmpp.disconnect(wait=wait)                    
+            #self.xmpp.disconnect(wait=wait) #Leaving in case xmpp is added to iotmq in the future                   
 
 #This is used by EcoVacsIOTMQ and EcoVacsXMPP for _ctl_to_dict
 def RepresentsInt(stringvar):
@@ -671,10 +668,7 @@ class EcoVacsIOTMQ(ClientMQTT):
         self.wait_until_ready()
 
     def subscribe_to_ctls(self, function):
-        self.ctl_subscribers.append(function)
-
-    #def subscribe_to_ctls_mqtt(self, function):
-    #    self.ctl_subscribers.append(function)        
+        self.ctl_subscribers.append(function)   
 
     def _disconnect(self):
         self.disconnect() #disconnect mqtt connection
