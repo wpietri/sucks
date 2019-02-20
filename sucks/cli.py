@@ -179,10 +179,15 @@ def edge(frequency, minutes):
         return CliAction(Edge(), wait=TimeWait(minutes * 60))
 
 
-@cli.command(help='spotcleans provided room(s)')
-@click.argument('room', type=click.STRING)
-def spotclean(room):
-    return CliAction(SpotArea('start', room), wait=StatusWait('charge_status', 'returning'))
+@cli.command(help='cleans provided area(s), ex: "0,1"',context_settings={"ignore_unknown_options": True}) #ignore_unknown for map coordinates with negatives
+@click.option("--map-position","-p", is_flag=True, help='clean provided map position instead of area, ex: "-602,1812,800,723"')
+@click.argument('area', type=click.STRING, required=True)
+def area(area, map_position):
+    if map_position:
+        return CliAction(SpotArea('start', map_position=area), wait=StatusWait('charge_status', 'returning'))    
+    else:
+        return CliAction(SpotArea('start', area=area), wait=StatusWait('charge_status', 'returning'))
+    
 
 @cli.command(help='returns to charger')
 def charge():

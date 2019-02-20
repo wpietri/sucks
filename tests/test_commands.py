@@ -61,31 +61,31 @@ def test_spotarea_command():
     assert_equals(ElementTree.tostring(c.to_xml()),
                 b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test namedarea clean
 
-    c = SpotArea('start', namedarea='0')
+    c = SpotArea('start', area='0')
     assert_equals(ElementTree.tostring(c.to_xml()),
                 b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test namedarea keyword clean
 
-    c = SpotArea('start', '', '01234,56789')
+    c = SpotArea('start', '', '-602,1812,800,723')
     assert_equals(ElementTree.tostring(c.to_xml()),
-                b'<ctl td="Clean"><clean act="s" deep="1" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea clean
+                b'<ctl td="Clean"><clean act="s" deep="1" p="-602,1812,800,723" speed="standard" type="SpotArea" /></ctl>')  #Test customarea clean
 
-    c = SpotArea('start', '', '01234,56789', '2')
+    c = SpotArea('start', '', '-602,1812,800,723', '2')
     assert_equals(ElementTree.tostring(c.to_xml()),
-                b'<ctl td="Clean"><clean act="s" deep="2" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea clean with deep 2
+                b'<ctl td="Clean"><clean act="s" deep="2" p="-602,1812,800,723" speed="standard" type="SpotArea" /></ctl>')  #Test customarea clean with deep 2
 
-    c = SpotArea('start', '', customarea='01234,56789')
+    c = SpotArea('start', '', map_position='-602,1812,800,723')
     assert_equals(ElementTree.tostring(c.to_xml()),
-                b'<ctl td="Clean"><clean act="s" deep="1" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea keyword clean with deep default
+                b'<ctl td="Clean"><clean act="s" deep="1" p="-602,1812,800,723" speed="standard" type="SpotArea" /></ctl>')  #Test customarea keyword clean with deep default
 
-    c = SpotArea('start', customarea='01234,56789', cleanings='2')
+    c = SpotArea('start', map_position='-602,1812,800,723', cleanings='2')
     assert_equals(ElementTree.tostring(c.to_xml()),
-                b'<ctl td="Clean"><clean act="s" deep="2" p="01234,56789" speed="standard" type="SpotArea" /></ctl>')  #Test customarea keyword and cleanings keyword clean with deep default
+                b'<ctl td="Clean"><clean act="s" deep="2" p="-602,1812,800,723" speed="standard" type="SpotArea" /></ctl>')  #Test customarea keyword and cleanings keyword clean with deep default
 
-    c = SpotArea('start', namedarea='0', customarea='01234,56789', cleanings='2')
+    c = SpotArea('start', area='0', map_position='-602,1812,800,723', cleanings='2')
     assert_equals(ElementTree.tostring(c.to_xml()),
                 b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test all keywords specified, should default to only mid
 
-    c = SpotArea('start', '0', '01234,56789','2')
+    c = SpotArea('start', '0', '-602,1812,800,723','2')
     assert_equals(ElementTree.tostring(c.to_xml()),
                 b'<ctl td="Clean"><clean act="s" mid="0" speed="standard" type="SpotArea" /></ctl>')  #Test all keywords specified, should default to only mid
 
