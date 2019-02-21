@@ -350,7 +350,9 @@ Different sid "Sound IDs" will play different sounds.  If the vacuum has Voice R
 ### SpotAreas
 For bots with mapping capability this tells a bot to clean specified rooms.
 
-For the CLI - the `spotclean` command takes a csv of ints - ex `spotclean 0,1`
+For the CLI - the `area` command takes a csv of ints - ex `area 0,1`
+
+You can add the option `--map-position` or `-p` to clean a specified map coordinate - ex `area -p "-602,1812,800,723"`
 
 For the Library - you could use `vacbot.run(SpotArea('start', '0,1'))`
 
