@@ -43,11 +43,11 @@ def test_custom_command_noargs():
 def test_clean_command():
     c = Clean()
     assert_equals(ElementTree.tostring(c.to_xml()),
-                  b'<ctl td="Clean"><clean speed="standard" type="auto" /></ctl>')  # protocol has attribs in other order
+                  b'<ctl td="Clean"><clean act="s" speed="standard" type="auto" /></ctl>')  # protocol has attribs in other order
     
     c = Clean('edge', 'high')
     assert_equals(ElementTree.tostring(c.to_xml()),
-                  b'<ctl td="Clean"><clean speed="strong" type="border" /></ctl>')  # protocol has attribs in other order
+                  b'<ctl td="Clean"><clean act="s" speed="strong" type="border" /></ctl>')  # protocol has attribs in other order
 
     c = Clean(iotmq=True)
     assert_equals(ElementTree.tostring(c.to_xml()),
@@ -93,13 +93,13 @@ def test_spotarea_command():
 def test_edge_command():
     c = Edge()
     assert_equals(ElementTree.tostring(c.to_xml()),
-                  b'<ctl td="Clean"><clean speed="strong" type="border" /></ctl>')  # protocol has attribs in other order
+                  b'<ctl td="Clean"><clean act="s" speed="strong" type="border" /></ctl>')  # protocol has attribs in other order
 
 
 def test_spot_command():
     c = Spot()
     assert_equals(ElementTree.tostring(c.to_xml()),
-                  b'<ctl td="Clean"><clean speed="strong" type="spot" /></ctl>')  # protocol has attribs in other order
+                  b'<ctl td="Clean"><clean act="s" speed="strong" type="spot" /></ctl>')  # protocol has attribs in other order
 
 
 def test_charge_command():
@@ -111,7 +111,7 @@ def test_charge_command():
 def test_stop_command():
     c = Stop()
     assert_equals(ElementTree.tostring(c.to_xml()),
-                  b'<ctl td="Clean"><clean speed="standard" type="stop" /></ctl>')
+                  b'<ctl td="Clean"><clean act="s" speed="standard" type="stop" /></ctl>')
 
 
 def test_play_sound_command():

@@ -13,6 +13,20 @@ def test_wrap_command():
     c = str(x._wrap_command(Clean().to_xml(), 'E0000000001234567890@126.ecorobot.net/atom'))
     assert_true(search(r'from="20170101abcdefabcdefa@ecouser.net/abcdef12"', c))
     assert_true(search(r'to="E0000000001234567890@126.ecorobot.net/atom"', c))
+    assert_true(search(r'td="Clean" id="',c)) #Check that an id was added to ctl
+
+    cwithid = Clean().to_xml()
+    cwithid.attrib["id"] = "12345678"
+    c = str(x._wrap_command(cwithid, 'E0000000001234567890@126.ecorobot.net/atom'))    
+    assert_true(search(r'td="Clean" id="12345678',c)) #Check that customid was added to ctl
+
+def test_getReqID():
+    x = make_ecovacs_xmpp()
+    rid = x.getReqID("12345678")
+    assert_equals(rid, "12345678") #Check returned ID is the same as provided
+
+    rid2 = x.getReqID()
+    assert_true(len(rid2) >= 8) #Check returned random ID is at least 8 chars
 
 def test_subscribe_to_ctls():
     response = None

@@ -6,9 +6,11 @@ from collections import OrderedDict
 from threading import Event
 import threading
 import sched
-
+import random
+import ssl
 import requests
 import stringcase
+
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
 from sleekxmpp.exceptions import XMPPError
@@ -16,8 +18,6 @@ from sleekxmpp.exceptions import XMPPError
 from paho.mqtt.client import Client  as ClientMQTT
 from paho.mqtt import publish as MQTTPublish
 from paho.mqtt import subscribe as MQTTSubscribe
-
-import ssl
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -856,7 +856,7 @@ class EcoVacsIOTMQ(ClientMQTT):
 
 class EcoVacsXMPP(ClientXMPP):
     def __init__(self, user, domain, resource, secret, continent, vacuum, server_address=None ):
-        ClientXMPP.__init__(self, user + '@' + domain, '0/' + resource + '/' + secret)
+        ClientXMPP.__init__(self, "{}@{}/{}".format(user, domain,resource), '0/' + resource + '/' + secret) #Init with resource to bind it
         self.user = user
         self.domain = domain
         self.resource = resource
@@ -922,11 +922,23 @@ class EcoVacsXMPP(ClientXMPP):
 
     def _wrap_command(self, ctl, recipient):
         q = self.make_iq_query(xmlns=u'com:ctl', ito=recipient, ifrom=self._my_address())
-        q['type'] = 'set'
+        q['type'] = 'set'        
+        if not "id" in ctl.attrib:
+            ctl.attrib["id"] = self.getReqID() #If no ctl id provided, add an id to the ctl. This was required for the ozmo930 and shouldn't hurt others
         for child in q.xml:
             if child.tag.endswith('query'):
                 child.append(ctl)
                 return q
+
+    def getReqID(self, customid="0"): #Generate a somewhat random string for request id, with minium 8 chars. Works similar to ecovacs app.
+        if customid != "0":            
+            return "{}".format(customid) #return provided id as string
+        else:            
+            rtnval = str(random.randint(1,50))
+            while len(str(rtnval)) <= 8:
+                rtnval = "{}{}".format(rtnval,random.randint(0,50))
+
+            return "{}".format(rtnval) #return as string
 
     def _my_address(self):
         if not self.vacuum['iotmq']:
@@ -995,10 +1007,8 @@ class VacBotCommand:
 class Clean(VacBotCommand):
     def __init__(self, mode='auto', speed='normal', iotmq=False, action='start',terminal=False, **kwargs):
         if kwargs == {}:
-            if not iotmq:
-                super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}})
-            else:
-                super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed],'act': CLEAN_ACTION_TO_ECOVACS[action]}})
+            #Looks like action is needed for some bots, shouldn't affect older models
+            super().__init__('Clean', {'clean': {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed],'act': CLEAN_ACTION_TO_ECOVACS[action]}})
         else:
             initcmd = {'type': CLEAN_MODE_TO_ECOVACS[mode], 'speed': FAN_SPEED_TO_ECOVACS[speed]}
             for kkey, kvalue in kwargs.items():
