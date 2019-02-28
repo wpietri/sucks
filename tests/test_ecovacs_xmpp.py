@@ -12,13 +12,21 @@ def test_wrap_command():
     x = make_ecovacs_xmpp()
     c = str(x._wrap_command(Clean().to_xml(), 'E0000000001234567890@126.ecorobot.net/atom'))
     assert_true(search(r'from="20170101abcdefabcdefa@ecouser.net/abcdef12"', c))
-    assert_true(search(r'to="E0000000001234567890@126.ecorobot.net/atom"', c))
-    assert_true(search(r'td="Clean" id="', c)) #Check that an id was added to ctl
+    assert_true(search(r'to="E0000000001234567890@126.ecorobot.net/atom"', c))    
+    #Convert to XML to make it easy to see if id was added to ctl
+    xml_test = ET.fromstring(c)
+    ctl = xml_test.getchildren()[0][0]
+    assert_true(ctl.get("id")) #Check that an id was added to ctl    
 
+    #Test if customid is added to ctl
     cwithid = Clean().to_xml()
-    cwithid.attrib["id"] = "12345678"
+    cwithid.attrib["id"] = "12345678" #customid 12345678
     c = str(x._wrap_command(cwithid, 'E0000000001234567890@126.ecorobot.net/atom'))    
-    assert_true(search(r'td="Clean" id="12345678', c)) #Check that customid was added to ctl
+    #Convert to XML to make it easy to see if id was added to ctl
+    xml_test = ET.fromstring(c)
+    ctl = xml_test.getchildren()[0][0]
+    assert_equals(ctl.get("id"), "12345678") #Check that an id was added to ctl    
+
 
 def test_getReqID():
     x = make_ecovacs_xmpp()
