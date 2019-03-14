@@ -304,6 +304,7 @@ class EcoVacsAPI:
         #These items were found in the Android app source by searching for "new IOTMqDevice("
         iotmqdevices = [
             'ls1ok3', #D900 / DE5G
+            'dl8fht', #D600
             # Possibly the Atmobot AA30 - qqy0di
             # Possibly the Slim4 - wbueya
         ]
