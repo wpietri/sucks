@@ -173,29 +173,6 @@ def test_device_lookup_IOTProduct():
         assert_equals(vacuum['iot_product'], False)
         assert_equals(vacuum['iotmq'], False)   
 
-def test_device_lookup_is_IOTProduct_not_IOTMQ():
-    api = make_api()
-    with requests_mock.mock() as m:
-        device_id = 'E0000001234567890123'
-        device_class = 'dl8fht' #D600
-
-        r = m.post(compile('user.do'),
-                text='{"todo": "result", "devices": [{"did": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_class))
-        r = m.post(compile('pim/product/getProductIotMap'),
-                text='{"code":0,"data":[{"classid":"dl8fht","product":{"_id":"5acb0fa87c295c0001876ecf","name":"DEEBOT 600 Series","icon":"5acc32067c295c0001876eea","UILogicId":"dl8fht","ota":false,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5acc32067c295c0001876eea"}},{"classid":"02uwxm","product":{"_id":"5ae1481e7ccd1a0001e1f69e","name":"DEEBOT OZMO Slim10 Series","icon":"5b1dddc48bc45700014035a1","UILogicId":"02uwxm","ota":false,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b1dddc48bc45700014035a1"}},{"classid":"y79a7u","product":{"_id":"5b04c0227ccd1a0001e1f6a8","name":"DEEBOT OZMO 900","icon":"5b04c0217ccd1a0001e1f6a7","UILogicId":"y79a7u","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b04c0217ccd1a0001e1f6a7"}},{"classid":"jr3pqa","product":{"_id":"5b43077b8bc457000140363e","name":"DEEBOT 711","icon":"5b5ac4cc8d5a56000111e769","UILogicId":"jr3pqa","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b5ac4cc8d5a56000111e769"}},{"classid":"uv242z","product":{"_id":"5b5149b4ac0b87000148c128","name":"DEEBOT 710","icon":"5b5ac4e45f21100001882bb9","UILogicId":"uv242z","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b5ac4e45f21100001882bb9"}},{"classid":"ls1ok3","product":{"_id":"5b6561060506b100015c8868","name":"DEEBOT 900 Series","icon":"5ba4a2cb6c2f120001c32839","UILogicId":"ls1ok3","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5ba4a2cb6c2f120001c32839"}}]}')
-                          
-        d = api.devices()
-        d = api.SetIOTDevices(d, api.getiotProducts())
-        
-        assert_equals(r.call_count, 1)
-        assert_equals(len(d), 1)
-        vacuum = d[0]
-        assert_equals(vacuum['did'], device_id)
-        assert_equals(vacuum['class'], device_class)
-        assert_equals(vacuum['iot_product'], True)
-        assert_equals(vacuum['iotmq'], False)                       
-
-
 def make_api():
     with requests_mock.mock() as m:
         m.get(compile('user/login'),
