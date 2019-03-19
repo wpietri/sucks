@@ -141,7 +141,8 @@ def cli(debug):
 @click.option('--country-code', prompt='your two-letter country code', default=lambda: current_country())
 @click.option('--continent-code', prompt='your two-letter continent code',
               default=lambda: continent_for_country(click.get_current_context().params['country_code']))
-def login(email, password, country_code, continent_code):
+@click.option('--verify-ssl', prompt='Verify SSL for API requests', default=True)
+def login(email, password, country_code, continent_code, verify_ssl):
     if config_file_exists() and not click.confirm('overwrite existing config?'):
         click.echo("Skipping login.")
         exit(0)
@@ -149,7 +150,7 @@ def login(email, password, country_code, continent_code):
     password_hash = EcoVacsAPI.md5(password)
     device_id = EcoVacsAPI.md5(str(time.time()))
     try:
-        EcoVacsAPI(device_id, email, password_hash, country_code, continent_code)
+        EcoVacsAPI(device_id, email, password_hash, country_code, continent_code, verify_ssl)
     except ValueError as e:
         click.echo(e.args[0])
         exit(1)
@@ -158,6 +159,7 @@ def login(email, password, country_code, continent_code):
     config['device_id'] = device_id
     config['country'] = country_code.lower()
     config['continent'] = continent_code.lower()
+    config['verify_ssl'] = verify_ssl
     write_config(config)
     click.echo("Config saved.")
     exit(0)
@@ -178,6 +180,16 @@ def edge(frequency, minutes):
     if should_run(frequency):
         return CliAction(Edge(), wait=TimeWait(minutes * 60))
 
+
+@cli.command(help='cleans provided area(s), ex: "0,1"',context_settings={"ignore_unknown_options": True}) #ignore_unknown for map coordinates with negatives
+@click.option("--map-position","-p", is_flag=True, help='clean provided map position instead of area, ex: "-602,1812,800,723"')
+@click.argument('area', type=click.STRING, required=True)
+def area(area, map_position):
+    if map_position:
+        return CliAction(SpotArea('start', map_position=area), wait=StatusWait('charge_status', 'returning'))    
+    else:
+        return CliAction(SpotArea('start', area=area), wait=StatusWait('charge_status', 'returning'))
+    
 
 @cli.command(help='returns to charger')
 def charge():
@@ -209,9 +221,9 @@ def run(actions, debug):
     if actions:
         config = read_config()
         api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
-                         config['country'], config['continent'])
+                         config['country'], config['continent'], verify_ssl=config['verify_ssl'])
         vacuum = api.devices()[0]
-        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'])
+        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'], verify_ssl=config['verify_ssl'])
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:
