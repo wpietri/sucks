@@ -245,6 +245,12 @@ Gets or sets value for option (0==Off, 1==On)
 
     Returns `<ctl ret='ok'/>`
 
+#### Mopping Water Amount
+Models with mopping capability (Ozmo) allow for changing the amount of water dispersed.  The value ranges from 1 (low) to 3 (high).
+
+`<ctl td="SetWaterPermeability" v="1"/>`
+
+
 #### Schedules
 ##### GetSched
 `<ctl td="GetSched"/>`
