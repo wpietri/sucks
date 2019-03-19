@@ -141,7 +141,8 @@ def cli(debug):
 @click.option('--country-code', prompt='your two-letter country code', default=lambda: current_country())
 @click.option('--continent-code', prompt='your two-letter continent code',
               default=lambda: continent_for_country(click.get_current_context().params['country_code']))
-def login(email, password, country_code, continent_code):
+@click.option('--verify-ssl', prompt='Verify SSL for API requests', default=True)
+def login(email, password, country_code, continent_code, verify_ssl):
     if config_file_exists() and not click.confirm('overwrite existing config?'):
         click.echo("Skipping login.")
         exit(0)
@@ -149,7 +150,7 @@ def login(email, password, country_code, continent_code):
     password_hash = EcoVacsAPI.md5(password)
     device_id = EcoVacsAPI.md5(str(time.time()))
     try:
-        EcoVacsAPI(device_id, email, password_hash, country_code, continent_code)
+        EcoVacsAPI(device_id, email, password_hash, country_code, continent_code, verify_ssl)
     except ValueError as e:
         click.echo(e.args[0])
         exit(1)
@@ -158,6 +159,7 @@ def login(email, password, country_code, continent_code):
     config['device_id'] = device_id
     config['country'] = country_code.lower()
     config['continent'] = continent_code.lower()
+    config['verify_ssl'] = verify_ssl
     write_config(config)
     click.echo("Config saved.")
     exit(0)
