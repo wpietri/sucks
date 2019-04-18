@@ -7,9 +7,9 @@ from threading import Event
 
 import requests
 import stringcase
-from sleekxmpp import ClientXMPP, Callback, MatchXPath
-from sleekxmpp.xmlstream import ET
-from sleekxmpp.exceptions import XMPPError
+from sleekxmppfs import ClientXMPP, Callback, MatchXPath
+from sleekxmppfs.xmlstream import ET
+from sleekxmppfs.exceptions import XMPPError
 
 _LOGGER = logging.getLogger(__name__)
 
