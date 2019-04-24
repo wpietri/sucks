@@ -3,7 +3,7 @@ from nose.tools import *
 from sucks import *
 
 from unittest.mock import Mock
-from sleekxmpp.exceptions import XMPPError
+from sleekxmppfs.exceptions import XMPPError
 
 
 def test_handle_clean_report():
