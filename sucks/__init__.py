@@ -10,6 +10,7 @@ import random
 import ssl
 import requests
 import stringcase
+import os
 
 from sleekxmpp import ClientXMPP, Callback, MatchXPath
 from sleekxmpp.xmlstream import ET
@@ -123,13 +124,21 @@ COMPONENT_FROM_ECOVACS = {
     'dust_case_heap': COMPONENT_FILTER
 }
 
-def str_to_bool(s):
+def str_to_bool_or_cert(s):
     if s == 'True' or s == True:
         return True
     elif s == 'False' or s == False:
         return False    
     else:
-        raise ValueError("Cannot covert {} to a bool".format(s))
+        if not s == None:
+            if os.path.exists(s): # User could provide a path to a CA Cert as well, which is useful for Bumper
+                if os.path.isfile(s):
+                    return s
+                else:                
+                    raise ValueError("Certificate path provided is not a file - {}".format(s))
+        
+        raise ValueError("Cannot covert {} to a bool or certificate path".format(s))
+        
 
 class EcoVacsAPI:
     CLIENT_KEY = "eJUWrzRv34qFSaYk"
@@ -161,7 +170,7 @@ class EcoVacsAPI:
             #'deviceType': '2' - iphone
         }
         
-        self.verify_ssl = str_to_bool(verify_ssl)
+        self.verify_ssl = str_to_bool_or_cert(verify_ssl)
         _LOGGER.debug("Setting up EcoVacsAPI")
         self.resource = device_id[0:8]
         self.country = country
@@ -633,7 +642,7 @@ class EcoVacsIOTMQ(ClientMQTT):
         self.vacuum = vacuum
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self.scheduler_thread = threading.Thread(target=self.scheduler.run, daemon=True, name="mqtt_schedule_thread")
-        self.verify_ssl = str_to_bool(verify_ssl)
+        self.verify_ssl = str_to_bool_or_cert(verify_ssl)
         
         if server_address is None:            
             self.hostname = ('mq-{}.ecouser.net'.format(self.continent))
