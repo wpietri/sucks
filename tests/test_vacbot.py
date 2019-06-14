@@ -387,5 +387,12 @@ def a_vacbot(bot=None, iotmq=False, monitor=False):
                   bot, 'na', monitor=monitor)
 
 def test_str_to_bool():
-     assert_raises(ValueError, str_to_bool, None) #Value error if str_to_bool can't convert
+    assert_raises(ValueError, str_to_bool_or_cert, None) #Value error if str_to_bool can't convert
+    assert_equals(True, str_to_bool_or_cert("True"))
+    assert_equals(False, str_to_bool_or_cert("False"))
+    assert_equals(
+        os.path.abspath(os.path.join(".", "tests", "test_vacbot.py")),        
+        str_to_bool_or_cert(os.path.abspath(os.path.join(".","tests","test_vacbot.py")))
+        )
+    assert_raises(ValueError,  str_to_bool_or_cert ,(os.path.abspath(os.path.join(".","tests"))))
  
