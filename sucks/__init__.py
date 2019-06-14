@@ -10,10 +10,9 @@ import random
 import ssl
 import requests
 import stringcase
-
-from sleekxmpp import ClientXMPP, Callback, MatchXPath
-from sleekxmpp.xmlstream import ET
-from sleekxmpp.exceptions import XMPPError
+from sleekxmppfs import ClientXMPP, Callback, MatchXPath
+from sleekxmppfs.xmlstream import ET
+from sleekxmppfs.exceptions import XMPPError
 
 from paho.mqtt.client import Client  as ClientMQTT
 from paho.mqtt import publish as MQTTPublish
