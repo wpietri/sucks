@@ -145,7 +145,7 @@ class EcoVacsAPI:
     PUBLIC_KEY = 'MIIB/TCCAWYCCQDJ7TMYJFzqYDANBgkqhkiG9w0BAQUFADBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMCAXDTE3MDUwOTA1MTkxMFoYDzIxMTcwNDE1MDUxOTEwWjBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDb8V0OYUGP3Fs63E1gJzJh+7iqeymjFUKJUqSD60nhWReZ+Fg3tZvKKqgNcgl7EGXp1yNifJKUNC/SedFG1IJRh5hBeDMGq0m0RQYDpf9l0umqYURpJ5fmfvH/gjfHe3Eg/NTLm7QEa0a0Il2t3Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GCSqGSIb3DQEBBQUAA4GBANhIMT0+IyJa9SU8AEyaWZZmT2KEYrjakuadOvlkn3vFdhpvNpnnXiL+cyWy2oU1Q9MAdCTiOPfXmAQt8zIvP2JC8j6yRTcxJCvBwORDyv/uBtXFxBPEC6MDfzU2gKAaHeeJUWrzRv34qFSaYkYta8canK+PSInylQTjJK9VqmjQ'
     MAIN_URL_FORMAT = 'https://eco-{country}-api.ecovacs.com/v1/private/{country}/{lang}/{deviceId}/{appCode}/{appVersion}/{channel}/{deviceType}'
     USER_URL_FORMAT = 'https://users-{continent}.ecouser.net:8000/user.do'
-    PORTAL_URL_FORMAT = 'https://portal-{continent}.ecouser.net/api'
+    PORTAL_URL_FORMAT = 'https://portal-ww.ecouser.net/api'
 
     USERSAPI = 'users/user.do'
     IOTDEVMANAGERAPI = 'iot/devmanager.do' # IOT Device Manager - This provides control of "IOT" products via RestAPI, some bots use this instead of XMPP
@@ -307,21 +307,13 @@ class EcoVacsAPI:
         return devices
 
     def SetIOTMQDevices(self, devices):
-        #Added for devices that utilize MQTT instead of XMPP for communication
-        #At this time the list is updated manually, so far only the D900 has been seen to use this
-        #These items were found in the Android app source by searching for "new IOTMqDevice("
-        iotmqdevices = [
-            'ls1ok3', #D900 / DE5G
-            'dl8fht', #D600
-            # Possibly the Atmobot AA30 - qqy0di
-            # Possibly the Slim4 - wbueya
-        ]
+        #Added for devices that utilize MQTT instead of XMPP for communication       
         for device in devices:
             device['iotmq'] = False
-            if device['class'] in iotmqdevices: #Check if the device is part of the list
+            if device['company'] == 'eco-ng': #Check if the device is part of the list
                 device['iotmq'] = True
                     
-        return devices        
+        return devices
        
     def devices(self):
         return self.SetIOTMQDevices(self.getdevices())
