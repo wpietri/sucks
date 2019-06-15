@@ -104,8 +104,9 @@ def test_device_lookup():
         #Not IOTMQ
         device_id = 'E0000001234567890123'
         device_class = '126'
+        device_company = 'eco-legacy'
         r = m.post(compile('user.do'),
-                text='{"todo": "result", "devices": [{"did": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_class))
+                text='{"todo": "result", "devices": [{"did": "%s", "company": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_company, device_class))
     
         d = api.devices()
         assert_equals(r.call_count, 1)
@@ -117,8 +118,9 @@ def test_device_lookup():
 
         #Is IOTMQ
         device_class = 'ls1ok3' #D900
+        device_company = 'eco-ng'
         r = m.post(compile('user.do'),
-                text='{"todo": "result", "devices": [{"did": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_class))
+                text='{"todo": "result", "devices": [{"did": "%s", "company": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_company, device_class))
 
         d = api.devices()
         assert_equals(r.call_count, 1)
@@ -136,9 +138,10 @@ def test_device_lookup_IOTProduct():
         #Is IOTProduct
         device_id = 'E0000001234567890123'
         device_class = 'ls1ok3' #D900
+        device_company = 'eco-ng'
 
         r = m.post(compile('user.do'),
-                text='{"todo": "result", "devices": [{"did": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_class))
+                text='{"todo": "result", "devices": [{"did": "%s", "company": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_company, device_class))
         r = m.post(compile('pim/product/getProductIotMap'),
                 text='{"code":0,"data":[{"classid":"dl8fht","product":{"_id":"5acb0fa87c295c0001876ecf","name":"DEEBOT 600 Series","icon":"5acc32067c295c0001876eea","UILogicId":"dl8fht","ota":false,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5acc32067c295c0001876eea"}},{"classid":"02uwxm","product":{"_id":"5ae1481e7ccd1a0001e1f69e","name":"DEEBOT OZMO Slim10 Series","icon":"5b1dddc48bc45700014035a1","UILogicId":"02uwxm","ota":false,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b1dddc48bc45700014035a1"}},{"classid":"y79a7u","product":{"_id":"5b04c0227ccd1a0001e1f6a8","name":"DEEBOT OZMO 900","icon":"5b04c0217ccd1a0001e1f6a7","UILogicId":"y79a7u","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b04c0217ccd1a0001e1f6a7"}},{"classid":"jr3pqa","product":{"_id":"5b43077b8bc457000140363e","name":"DEEBOT 711","icon":"5b5ac4cc8d5a56000111e769","UILogicId":"jr3pqa","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b5ac4cc8d5a56000111e769"}},{"classid":"uv242z","product":{"_id":"5b5149b4ac0b87000148c128","name":"DEEBOT 710","icon":"5b5ac4e45f21100001882bb9","UILogicId":"uv242z","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b5ac4e45f21100001882bb9"}},{"classid":"ls1ok3","product":{"_id":"5b6561060506b100015c8868","name":"DEEBOT 900 Series","icon":"5ba4a2cb6c2f120001c32839","UILogicId":"ls1ok3","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5ba4a2cb6c2f120001c32839"}}]}')
                           
@@ -156,9 +159,10 @@ def test_device_lookup_IOTProduct():
         #Not IOTProduct
         device_id = 'E0000001234567890123'
         device_class = '126'
+        device_company = 'eco-legacy'
 
         r = m.post(compile('user.do'),
-                text='{"todo": "result", "devices": [{"did": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_class))
+                text='{"todo": "result", "devices": [{"did": "%s", "company": "%s", "class": "%s", "nick": "bob"}], "result": "ok"}' %(device_id, device_company, device_class))
         r = m.post(compile('pim/product/getProductIotMap'),
                 text='{"code":0,"data":[{"classid":"dl8fht","product":{"_id":"5acb0fa87c295c0001876ecf","name":"DEEBOT 600 Series","icon":"5acc32067c295c0001876eea","UILogicId":"dl8fht","ota":false,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5acc32067c295c0001876eea"}},{"classid":"02uwxm","product":{"_id":"5ae1481e7ccd1a0001e1f69e","name":"DEEBOT OZMO Slim10 Series","icon":"5b1dddc48bc45700014035a1","UILogicId":"02uwxm","ota":false,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b1dddc48bc45700014035a1"}},{"classid":"y79a7u","product":{"_id":"5b04c0227ccd1a0001e1f6a8","name":"DEEBOT OZMO 900","icon":"5b04c0217ccd1a0001e1f6a7","UILogicId":"y79a7u","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b04c0217ccd1a0001e1f6a7"}},{"classid":"jr3pqa","product":{"_id":"5b43077b8bc457000140363e","name":"DEEBOT 711","icon":"5b5ac4cc8d5a56000111e769","UILogicId":"jr3pqa","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b5ac4cc8d5a56000111e769"}},{"classid":"uv242z","product":{"_id":"5b5149b4ac0b87000148c128","name":"DEEBOT 710","icon":"5b5ac4e45f21100001882bb9","UILogicId":"uv242z","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5b5ac4e45f21100001882bb9"}},{"classid":"ls1ok3","product":{"_id":"5b6561060506b100015c8868","name":"DEEBOT 900 Series","icon":"5ba4a2cb6c2f120001c32839","UILogicId":"ls1ok3","ota":true,"iconUrl":"https://portal-ww.ecouser.net/api/pim/file/get/5ba4a2cb6c2f120001c32839"}}]}')
                           
