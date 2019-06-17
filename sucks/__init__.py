@@ -145,7 +145,7 @@ class EcoVacsAPI:
     PUBLIC_KEY = 'MIIB/TCCAWYCCQDJ7TMYJFzqYDANBgkqhkiG9w0BAQUFADBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMCAXDTE3MDUwOTA1MTkxMFoYDzIxMTcwNDE1MDUxOTEwWjBCMQswCQYDVQQGEwJjbjEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQKDBNEZWZhdWx0IENvbXBhbnkgTHRkMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDb8V0OYUGP3Fs63E1gJzJh+7iqeymjFUKJUqSD60nhWReZ+Fg3tZvKKqgNcgl7EGXp1yNifJKUNC/SedFG1IJRh5hBeDMGq0m0RQYDpf9l0umqYURpJ5fmfvH/gjfHe3Eg/NTLm7QEa0a0Il2t3Cyu5jcR4zyK6QEPn1hdIGXB5QIDAQABMA0GCSqGSIb3DQEBBQUAA4GBANhIMT0+IyJa9SU8AEyaWZZmT2KEYrjakuadOvlkn3vFdhpvNpnnXiL+cyWy2oU1Q9MAdCTiOPfXmAQt8zIvP2JC8j6yRTcxJCvBwORDyv/uBtXFxBPEC6MDfzU2gKAaHeeJUWrzRv34qFSaYkYta8canK+PSInylQTjJK9VqmjQ'
     MAIN_URL_FORMAT = 'https://eco-{country}-api.ecovacs.com/v1/private/{country}/{lang}/{deviceId}/{appCode}/{appVersion}/{channel}/{deviceType}'
     USER_URL_FORMAT = 'https://users-{continent}.ecouser.net:8000/user.do'
-    PORTAL_URL_FORMAT = 'https://portal-ww.ecouser.net/api'
+    PORTAL_URL_FORMAT = 'https://portal-{continent}.ecouser.net/api'
 
     USERSAPI = 'users/user.do'
     IOTDEVMANAGERAPI = 'iot/devmanager.do' # IOT Device Manager - This provides control of "IOT" products via RestAPI, some bots use this instead of XMPP
@@ -235,8 +235,8 @@ class EcoVacsAPI:
             raise RuntimeError(
                 "failure {} ({}) for call {} and parameters {}".format(json['error'], json['errno'], function, params))
 
-    def __call_portal_api(self, api, function, args, verify_ssl=True):
-        _LOGGER.debug("calling portal api {} function {} with {}".format(api, function, args))
+    def __call_portal_api(self, api, function, args, verify_ssl=True, **kwargs):      
+        
         if api == self.USERSAPI:
             params = {'todo': function}
             params.update(args)
@@ -244,7 +244,13 @@ class EcoVacsAPI:
             params = {}
             params.update(args)
 
-        url = (EcoVacsAPI.PORTAL_URL_FORMAT + "/" + api).format(continent=self.continent, **self.meta)        
+        _LOGGER.debug("calling portal api {} function {} with {}".format(api, function, params))            
+        
+        continent = self.continent
+        if 'continent' in kwargs:
+            continent = kwargs.get('continent')
+
+        url = (EcoVacsAPI.PORTAL_URL_FORMAT + "/" + api).format(continent=continent, **self.meta)        
         
         response = requests.post(url, json=params, verify=verify_ssl)        
 
@@ -253,7 +259,17 @@ class EcoVacsAPI:
         if api == self.USERSAPI:    
             if json['result'] == 'ok':
                 return json
-                
+            elif json['result'] == 'fail':
+                if json['error'] == 'set token error.': # If it is a set token error try again
+                    if not 'set_token' in kwargs:      
+                        _LOGGER.debug("loginByItToken set token error, trying again (2/3)")              
+                        return self.__call_portal_api(self.USERSAPI, function, args, verify_ssl=verify_ssl, set_token=1)
+                    elif kwargs.get('set_token') == 1:
+                        _LOGGER.debug("loginByItToken set token error, trying again with ww (3/3)")              
+                        return self.__call_portal_api(self.USERSAPI, function, args, verify_ssl=verify_ssl, set_token=2, continent="ww")
+                    else:
+                        _LOGGER.debug("loginByItToken set token error, failed after 3 attempts")
+                                    
         if api.startswith(self.PRODUCTAPI):
             if json['code'] == 0:
                 return json      
