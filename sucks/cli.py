@@ -165,12 +165,16 @@ def login(email, password, country_code, continent_code, verify_ssl):
     exit(0)
 
 
-@cli.command(help='auto-cleans for the specified number of minutes')
+@cli.command(help='auto-cleans for the specified number of minutes, if minutes is 0 auto clean until bot returns to charger by itself')
 @click.option('--frequency', '-f', type=FREQUENCY, help='frequency with which to run; e.g. 0.5 or 3/7')
 @click.argument('minutes', type=click.FLOAT)
 def clean(frequency, minutes):
+    waiter = StatusWait('charge_status', 'charging')    
+    if minutes > 0:
+        waiter = TimeWait(minutes * 60)
+
     if should_run(frequency):
-        return CliAction(Clean(), wait=TimeWait(minutes * 60))
+        return CliAction(Clean(), wait=waiter)
 
 
 @cli.command(help='cleans room edges for the specified number of minutes')
