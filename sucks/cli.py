@@ -8,8 +8,9 @@ import re
 import click
 from pycountry_convert import country_alpha2_to_continent_code
 
+import sucks
 from sucks import *
-
+print(sucks.__file__)
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -67,12 +68,15 @@ class StatusWait(BotWait):
 
     def wait(self, bot):
         if not hasattr(bot, self.wait_on):
-            raise ValueError("object " + bot + " does not have method " + self.wait_on)
-        _LOGGER.debug("waiting on " + self.wait_on + " for value " + self.wait_for)
+            raise ValueError("object " + bot +
+                             " does not have method " + self.wait_on)
+        _LOGGER.debug("waiting on " + self.wait_on +
+                      " for value " + self.wait_for)
 
         while getattr(bot, self.wait_on) != self.wait_for:
             time.sleep(0.5)
-        _LOGGER.debug("wait complete; " + self.wait_on + " is now " + self.wait_for)
+        _LOGGER.debug("wait complete; " + self.wait_on +
+                      " is now " + self.wait_for)
 
 
 class CliAction:
@@ -96,7 +100,8 @@ def config_file_exists():
 def read_config():
     parser = configparser.ConfigParser()
     with open(config_file()) as fp:
-        parser.read_file(itertools.chain(['[global]'], fp), source=config_file())
+        parser.read_file(itertools.chain(
+            ['[global]'], fp), source=config_file())
     return parser['global']
 
 
@@ -124,7 +129,8 @@ def should_run(frequency):
         return True
     n = random.random()
     result = n <= frequency
-    _LOGGER.debug("tossing coin: {:0.3f} <= {:0.3f}: {}".format(n, frequency, result))
+    _LOGGER.debug("tossing coin: {:0.3f} <= {:0.3f}: {}".format(
+        n, frequency, result))
     return result
 
 
@@ -150,7 +156,8 @@ def login(email, password, country_code, continent_code, verify_ssl):
     password_hash = EcoVacsAPI.md5(password)
     device_id = EcoVacsAPI.md5(str(time.time()))
     try:
-        EcoVacsAPI(device_id, email, password_hash, country_code, continent_code, verify_ssl)
+        EcoVacsAPI(device_id, email, password_hash,
+                   country_code, continent_code, verify_ssl)
     except ValueError as e:
         click.echo(e.args[0])
         exit(1)
@@ -169,7 +176,7 @@ def login(email, password, country_code, continent_code, verify_ssl):
 @click.option('--frequency', '-f', type=FREQUENCY, help='frequency with which to run; e.g. 0.5 or 3/7')
 @click.argument('minutes', type=click.FLOAT)
 def clean(frequency, minutes):
-    waiter = StatusWait('charge_status', 'charging')    
+    waiter = StatusWait('charge_status', 'charging')
     if minutes > 0:
         waiter = TimeWait(minutes * 60)
 
@@ -185,15 +192,16 @@ def edge(frequency, minutes):
         return CliAction(Edge(), wait=TimeWait(minutes * 60))
 
 
-@cli.command(help='cleans provided area(s), ex: "0,1"',context_settings={"ignore_unknown_options": True}) #ignore_unknown for map coordinates with negatives
-@click.option("--map-position","-p", is_flag=True, help='clean provided map position instead of area, ex: "-602,1812,800,723"')
+# ignore_unknown for map coordinates with negatives
+@cli.command(help='cleans provided area(s), ex: "0,1"', context_settings={"ignore_unknown_options": True})
+@click.option("--map-position", "-p", is_flag=True, help='clean provided map position instead of area, ex: "-602,1812,800,723"')
 @click.argument('area', type=click.STRING, required=True)
 def area(area, map_position):
     if map_position:
-        return CliAction(SpotArea('start', map_position=area), wait=StatusWait('charge_status', 'returning'))    
+        return CliAction(SpotArea('start', map_position=area), wait=StatusWait('charge_status', 'returning'))
     else:
         return CliAction(SpotArea('start', area=area), wait=StatusWait('charge_status', 'returning'))
-    
+
 
 @cli.command(help='returns to charger')
 def charge():
@@ -207,6 +215,21 @@ def charge_action():
 @cli.command(help='stops the robot in its current position')
 def stop():
     return CliAction(Stop(), terminal=True, wait=StatusWait('clean_status', 'stop'))
+
+
+@cli.command(help='pause the robot in its current position')
+def pause():
+    return CliAction(Pause(), terminal=True, wait=StatusWait('clean_status', 'pause'))
+
+
+@cli.command(help='Resume job')
+def resume():
+    return CliAction(Resume(), terminal=True, wait=StatusWait('charge_status', 'charging'))
+
+
+@cli.command(help='get the current state of the robot')
+def state():
+    return CliAction(GetCleanState(), terminal=True, wait=TimeWait(10))
 
 
 @cli.resultcallback()
@@ -227,7 +250,8 @@ def run(actions, debug):
         api = EcoVacsAPI(config['device_id'], config['email'], config['password_hash'],
                          config['country'], config['continent'], verify_ssl=config['verify_ssl'])
         vacuum = api.devices()[0]
-        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token, vacuum, config['continent'], verify_ssl=config['verify_ssl'])
+        vacbot = VacBot(api.uid, api.REALM, api.resource, api.user_access_token,
+                        vacuum, config['continent'], verify_ssl=config['verify_ssl'])
         vacbot.connect_and_wait_until_ready()
 
         for action in actions:

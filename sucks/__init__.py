@@ -30,6 +30,7 @@ CLEAN_MODE_SPOT = 'spot'
 CLEAN_MODE_SPOT_AREA = 'spot_area'
 CLEAN_MODE_SINGLE_ROOM = 'single_room'
 CLEAN_MODE_STOP = 'stop'
+CLEAN_MODE_PAUSE = 'pause'
 
 CLEAN_ACTION_START = 'start'
 CLEAN_ACTION_PAUSE = 'pause'
@@ -61,7 +62,8 @@ CLEAN_MODE_TO_ECOVACS = {
     CLEAN_MODE_SPOT: 'spot',
     CLEAN_MODE_SPOT_AREA: 'SpotArea',
     CLEAN_MODE_SINGLE_ROOM: 'singleroom',
-    CLEAN_MODE_STOP: 'stop'
+    CLEAN_MODE_STOP: 'stop',
+    CLEAN_MODE_PAUSE: 'pause',
 }
 
 CLEAN_ACTION_TO_ECOVACS = {
@@ -85,7 +87,8 @@ CLEAN_MODE_FROM_ECOVACS = {
     'spot_area': CLEAN_MODE_SPOT_AREA,
     'singleroom': CLEAN_MODE_SINGLE_ROOM,
     'stop': CLEAN_MODE_STOP,
-    'going': CHARGE_MODE_RETURNING
+    'going': CHARGE_MODE_RETURNING,
+    'pause': CLEAN_MODE_PAUSE,
 }
 
 FAN_SPEED_TO_ECOVACS = {
@@ -727,8 +730,9 @@ class EcoVacsIOTMQ(ClientMQTT):
             return False
 
     def send_command(self, action, recipient):
-        if action.name == "Clean": #For handling Clean when action not specified (i.e. CLI)
-            action.args['clean']['act'] = CLEAN_ACTION_TO_ECOVACS['start'] #Inject a start action
+        # these lines cause pause commands to not work, so it is disabled
+        # if action.name == "Clean": #For handling Clean when action not specified (i.e. CLI)
+            # action.args['clean']['act'] = CLEAN_ACTION_TO_ECOVACS['start'] #Inject a start action
         c = self._wrap_command(action, recipient)
         _LOGGER.debug('Sending command {0}'.format(c))
         self._handle_ctl_api(action, 
@@ -1044,7 +1048,17 @@ class Spot(Clean):
 
 class Stop(Clean):
     def __init__(self):
-        super().__init__('stop', 'normal')
+        super().__init__(mode='stop', action="stop")
+
+class Pause(Clean):
+    def __init__(self):
+        super().__init__(mode="pause",action='pause')
+
+
+class Resume(Clean):
+    def __init__(self):
+        super().__init__(mode="auto",action='resume')
+
 
 class SpotArea(Clean):
     def __init__(self, action='start', area='', map_position='', cleanings='1'):
