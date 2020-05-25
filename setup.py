@@ -15,9 +15,9 @@ except FileNotFoundError:
 
 setup(
     name='sucks',
-    version='0.9.4',
+    version='0.9.6',
 
-    description='a library for controlling certain robot vacuums',
+    description='an abandoned library for controlling certain robot vacuums',
     long_description=long_description,
 
     url='https://github.com/wpietri/sucks',

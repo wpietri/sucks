@@ -5,6 +5,17 @@ Windows: [![Build Status](https://ci.appveyor.com/api/projects/status/github/wpi
 sucks
 =====
 
+## Caution: Abandonware ahead
+
+As of March 2020, this is no longer an active project. My Ecovacs robot died and
+has since been replaced with a Roomba. That means I can't see if code changes work,
+so I can't even usefully approve patches. As of yet, nobody has agreed to take it
+over. If you are interested in doing so, please join the
+[mailing list](https://groups.google.com/forum/#!forum/sucks-users)
+and discuss it there. 
+
+## Overview
+
 A simple command-line python script to drive a robot vacuum. Currently
 known to work with the Ecovacs Deebot N79, M80 Pro, M81, M88
 Pro, and R95 MKII from both North America and Europe.
