@@ -68,6 +68,7 @@ setup(
         'requests>=2.18',
         'pycryptodome>=3.4',
         'pycountry-convert>=0.5',
+        'paho-mqtt>=1.4',
         'stringcase>=1.2'
     ],
 

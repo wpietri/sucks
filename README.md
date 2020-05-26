@@ -110,8 +110,8 @@ shaping the API.
 
 A simple usage might go something like this:
 
-```
-import sucks
+```python
+from sucks import *
 
 config = ...
 
