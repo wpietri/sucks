@@ -1,9 +1,9 @@
 from nose.tools import *
 
 from sucks import *
-
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from sleekxmppfs.exceptions import XMPPError
+from paho.mqtt.client import MQTT_ERR_UNKNOWN as MQTTError
 
 
 def test_handle_clean_report():
@@ -30,6 +30,23 @@ def test_handle_clean_report():
     assert_equals('a_weird_speed', v.fan_speed)
 
 
+             
+def test_not_iot_send_command_clean():
+    from unittest.mock import MagicMock
+    v = a_vacbot(iotmq=False)
+    v.xmpp.send_command = MagicMock()
+    v.send_command(VacBotCommand('Clean'))
+    assert v.xmpp.send_command.called #test when iot is False it uses xmpp.send_command
+
+
+def test_iot_send_command_clean():
+    from unittest.mock import MagicMock
+    v = a_vacbot(iotmq=True)
+    v.iotmq.send_command = MagicMock()
+    v.send_command(VacBotCommand('Clean'))
+    assert v.iotmq.send_command.called #test when iot is True it uses iotmq.send_command
+
+
 def test_handle_charge_state():
     v = a_vacbot()
     assert_equals(None, v.clean_status)
@@ -41,6 +58,18 @@ def test_handle_charge_state():
     assert_equals('charging', v.charge_status)
 
     v._handle_ctl({'event': 'charge_state', 'type': 'idle'})
+    assert_equals('idle', v.charge_status)
+
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '9'}) #Seen in IOT - "but on charger, but turned off"
+    assert_equals('idle', v.charge_status)
+
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '8'}) #Seen in IOT - could be "already charging"
+    assert_equals('charging', v.charge_status)
+
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '5'}) #Seen in IOT - could be "busy with another command"
+    assert_equals('idle', v.charge_status)
+
+    v._handle_ctl({'event': 'charge_state', 'ret': 'fail', 'errno': '3'}) #Seen in IOT - could be "Bot in stuck state, example dust bin out"
     assert_equals('idle', v.charge_status)
 
     v._handle_ctl({'event': 'charge_state', 'type': 'a_type_not_supported_by_sucks'})
@@ -79,6 +108,7 @@ def test_handle_battery_info():
     v._handle_ctl({'event': 'battery_info', 'power': '000'})
     assert_equals(0.0, v.battery_status)
 
+
 def test_lifespan_reports():
     v = a_vacbot()
     assert_equals({}, v.components)
@@ -97,6 +127,10 @@ def test_lifespan_reports():
     v._handle_ctl({'event': 'life_span', 'type': 'a_weird_component', 'total': '100', 'val': '87'})
     assert_equals({'side_brush': 0, 'main_brush': 0.01, 'a_weird_component': 0.87}, v.components)
 
+    v._handle_ctl({'event': 'life_span', 'type': 'side_brush', 'total': '100', 'left': '120'})
+    assert_equals(2.0, v.components['side_brush']) #test left (2 hours / 120 mins) instead of val
+
+
 def test_is_cleaning():
     v = a_vacbot()
 
@@ -113,6 +147,14 @@ def test_is_cleaning():
 
     v._handle_ctl({'event': 'charge_state', 'type': 'going'})
     assert_false(v.is_cleaning)
+
+    v = a_vacbot(iotmq=True)
+    v._handle_ctl({'event': 'clean_report', 'type': 'spot_area', 'speed':'normal','st':'h'})
+    assert_false(v.is_cleaning) #test iot and state paused
+
+    v = a_vacbot(iotmq=True)
+    v._handle_ctl({'event': 'clean_report', 'type': 'spot_area', 'speed':'normal','st':'r'})
+    assert_true(v.is_cleaning) #test iot and state running
 
 def test_is_charging():
     v = a_vacbot()
@@ -131,9 +173,12 @@ def test_is_charging():
     v._handle_ctl({'event': 'clean_report', 'type': 'edge', 'speed': 'normal'})
     assert_false(v.is_charging)
 
-def test_send_ping_no_monitor():
-    v = a_vacbot()
 
+
+
+def test_send_ping_no_monitor():
+    #Test XMPP Ping
+    v = a_vacbot()
     mock = v.xmpp.send_ping = Mock()
     v.send_ping()
 
@@ -151,8 +196,28 @@ def test_send_ping_no_monitor():
     v.send_ping()
     assert_equals(None, v.vacuum_status)
 
+    #Test MQTT Ping
+    v = a_vacbot(iotmq=True)
+    mock = v.iotmq.send_ping = Mock()
+    v.send_ping()
+
+    # On four failed pings, vacuum state gets set to 'offline'
+    mock.return_value = False
+    v.send_ping()
+    v.send_ping()
+    v.send_ping()
+    assert_equals(None, v.vacuum_status)
+    v.send_ping()
+    assert_equals('offline', v.vacuum_status)
+
+    # On a successful ping after the offline state, state gets reset to None, indicating that it is unknown
+    mock.return_value = True
+    v.send_ping()
+    assert_equals(None, v.vacuum_status)
+
 
 def test_send_ping_with_monitor():
+    #Test XMPP Ping
     v = a_vacbot(monitor=True)
 
     ping_mock = v.xmpp.send_ping = Mock()
@@ -175,6 +240,33 @@ def test_send_ping_with_monitor():
 
     # On a successful ping after the offline state, a request for initial statuses is made
     ping_mock.side_effect = None
+    request_statuses_mock.reset_mock()
+    v.send_ping()
+    assert_equals(1, request_statuses_mock.call_count)
+
+    #Test MQTT Ping
+    v = a_vacbot(iotmq=True, monitor=True)
+
+    ping_mock = v.iotmq.send_ping = Mock()
+    request_statuses_mock = v.request_all_statuses = Mock()
+
+    # First ping should try to fetch statuses
+    v.send_ping()
+    assert_equals(1, request_statuses_mock.call_count)
+
+    # Nothing blowing up is success
+
+    # On four failed pings, vacuum state gets set to 'offline'
+    ping_mock.return_value = False
+    v.send_ping()
+    v.send_ping()
+    v.send_ping()
+    assert_equals(None, v.vacuum_status)
+    v.send_ping()
+    assert_equals('offline', v.vacuum_status)
+
+    # On a successful ping after the offline state, a request for initial statuses is made
+    ping_mock.return_value = True
     request_statuses_mock.reset_mock()
     v.send_ping()
     assert_equals(1, request_statuses_mock.call_count)
@@ -242,7 +334,10 @@ def test_error_event_subscription():
     mock = Mock()
     v.errorEvents.subscribe(mock)
     v._handle_ctl({'event': 'error', 'error': 'an_error_name'})
-    mock.assert_called_once_with('an_error_name')
+    v._handle_ctl({'event': 'error', 'errs': 'an_error_name2'}) #added for testing errs
+    assert_equals(2, mock.call_count)
+    #mock.assert_called_once_with('an_error_name')
+
 
     # Test unsubscribe
     mock = Mock()
@@ -270,18 +365,34 @@ def test_handle_unknown_ctl():
 # plus errors!
 
 def test_bot_address():
-    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "126", "nick": "bob"})
+    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "126", "nick": "bob", "iotmq":False})
     assert_equals('E0000000001234567890@126.ecorobot.net/atom', v._vacuum_address())
 
 
+def test_bot_address_iot():
+    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "126", "nick": "bob", "iotmq":True})
+    assert_equals('E0000000001234567890', v._vacuum_address())
+
+
 def test_model_variation():
-    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "141", "nick": "bob"})
+    v = a_vacbot(bot={"did": "E0000000001234567890", "class": "141", "nick": "bob","iotmq":False})
     assert_equals('E0000000001234567890@141.ecorobot.net/atom', v._vacuum_address())
 
 
 
-def a_vacbot(bot=None, monitor=False):
+def a_vacbot(bot=None, iotmq=False, monitor=False):
     if bot is None:
-        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob"}
+        bot = {"did": "E0000000001234567890", "class": "126", "nick": "bob", "iotmq": iotmq}
     return VacBot('20170101abcdefabcdefa', 'ecouser.net', 'abcdef12', 'A1b2C3d4efghijklmNOPQrstuvwxyz12',
                   bot, 'na', monitor=monitor)
+
+def test_str_to_bool():
+    assert_raises(ValueError, str_to_bool_or_cert, None) #Value error if str_to_bool can't convert
+    assert_equals(True, str_to_bool_or_cert("True"))
+    assert_equals(False, str_to_bool_or_cert("False"))
+    assert_equals(
+        os.path.abspath(os.path.join(".", "tests", "test_vacbot.py")),        
+        str_to_bool_or_cert(os.path.abspath(os.path.join(".","tests","test_vacbot.py")))
+        )
+    assert_raises(ValueError,  str_to_bool_or_cert ,(os.path.abspath(os.path.join(".","tests"))))
+ 
