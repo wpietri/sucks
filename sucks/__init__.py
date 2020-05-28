@@ -425,7 +425,7 @@ class EcoVacsXMPP(ClientXMPP):
 
         self.user = user
         self.domain = domain
-        self.resource = resource
+        self.boundjid.resource = resource
         self.continent = continent
         self.credentials['authzid'] = user
         if server_address is None:
