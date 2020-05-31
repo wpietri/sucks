@@ -461,11 +461,29 @@ class EcoVacsXMPP(ClientXMPP):
         result = xml.attrib.copy()
         if 'td' not in result:
             # This happens for commands with no response data, such as PlaySound
-            return
+            # Handle response data with no 'td'
 
-        result['event'] = result.pop('td')
-        if xml:
-            result.update(xml[0].attrib)
+            if 'type' in result: # single element with type and val
+                result['event'] = "LifeSpan" # seems to always be LifeSpan type
+                # don't need to update attrib since there's no child
+
+            else: # non-'type' result with child element that has attribs
+                if len(xml) > 0: # case where there is child element
+                    if 'clean' in xml[0].tag:
+                        result['event'] = "CleanReport"
+                    elif 'charge' in xml[0].tag:
+                        result['event'] = "ChargeState"
+                    elif 'battery' in xml[0].tag:
+                        result['event'] = "BatteryInfo"
+                    else:
+                        return
+                    result.update(xml[0].attrib)
+                else: # for non-'type' result with no child element, e.g., result of PlaySound
+                    return
+        else: # response includes 'td'
+            result['event'] = result.pop('td')
+            if xml:
+                result.update(xml[0].attrib)
 
         for key in result:
             result[key] = stringcase.snakecase(result[key])
